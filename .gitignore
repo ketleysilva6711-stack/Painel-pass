@@ -1,0 +1,60 @@
+# ==========================================
+# LARAVEL
+# ==========================================
+/backend/vendor
+/backend/node_modules
+/backend/public/hot
+/backend/public/storage
+/backend/storage/*.key
+/backend/.env
+/backend/.env.*
+/backend/.env.backup
+/backend/.phpunit.result.cache
+/backend/Homestead.yml
+/backend/Homestead.json
+/backend/npm-debug.log
+/backend/yarn-error.log
+/backend/.vite
+/backend/.idea
+/backend/.vscode
+# ==========================================
+# VUE / VITE / NODE
+# ==========================================
+/frontend/node_modules
+/frontend/dist
+/frontend/dist-ssr
+/frontend/*.local
+/frontend/.vite
+/frontend/.env
+/frontend/.env.*
+/frontend/.env.backup
+/frontend/*.log
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+/frontend/pnpm-debug.log*
+/frontend/.idea
+/frontend/.vscode
+# ==========================================
+# DOCKER
+# ==========================================
+.docker/
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+!docker-compose.*.example.yml
+.env.docker
+.env.docker.local
+# ==========================================
+# IDE / EDITORS
+# ==========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.netbeans/
+.phpintel/
+.phpstorm.meta.php
