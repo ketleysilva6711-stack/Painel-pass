@@ -9,6 +9,8 @@ import BankInjectView from '../views/BankInjectView.vue';
 import PublicAppView from '../views/PublicAppView.vue';
 import AdminDashboardView from '../views/AdminDashboardView.vue';
 import GaleriaTemplatesView from '../views/GaleriaTemplatesView.vue';
+import AdminUsuariosView from '../views/AdminUsuariosView.vue';
+import SuporteView from '../views/SuporteView.vue';
 import { useAuthStore } from '../stores/auth';
 
 const PlaceholderView = {
@@ -37,11 +39,11 @@ const routes = [
       { path: 'tools/tela-preta',    name: 'tela-preta',     component: GaleriaTemplatesView },
       { path: 'tools/inject-bancos', name: 'inject-bancos',  component: BankInjectView },
       { path: 'tutoriais',           name: 'tutoriais',      component: PlaceholderView },
-      { path: 'suporte',             name: 'suporte',        component: PlaceholderView },
+      { path: 'suporte',             name: 'suporte',        component: SuporteView },
 
       // Rotas do Admin
       { path: 'admin/dashboard',    name: 'admin-dashboard',    component: AdminDashboardView },
-      { path: 'admin/usuarios',     name: 'admin-usuarios',     component: PlaceholderView },
+      { path: 'admin/usuarios',     name: 'admin-usuarios',     component: AdminUsuariosView },
       { path: 'admin/revendedores', name: 'admin-revendedores', component: PlaceholderView },
       { path: 'admin/planos',       name: 'admin-planos',       component: PlaceholderView },
       { path: 'admin/financeiro',   name: 'admin-financeiro',   component: PlaceholderView },

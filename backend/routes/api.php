@@ -6,6 +6,9 @@ use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\BypassController;
 use App\Http\Controllers\BankInjectController;
 use App\Http\Controllers\PublicAppController;
+use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\SupportController;
+use App\Http\Controllers\TemplateController;
 
 Route::get('/health', function () { return response()->json(['status' => 'online', 'service' => 'The Vault API', 'timestamp' => now()]); });
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -51,4 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/templates', [TemplateController::class, 'index']);
     Route::get('/templates/{id}', [TemplateController::class, 'show']);
     Route::get('/templates/{id}/download', [TemplateController::class, 'download']);
+
+    Route::get('/admin/users-list', [AdminUserController::class, 'index']);
+    Route::put('/admin/users-list/{id}', [AdminUserController::class, 'update']);
+
+    Route::get('/support/tickets', [SupportController::class, 'index']);
+    Route::post('/support/tickets', [SupportController::class, 'store']);
 });
