@@ -27,6 +27,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tools/bypass', [BypassController::class, 'index']);
     Route::post('/tools/bypass', [BypassController::class, 'store']);
 
+    Route::get('/bypass-rules', [BypassController::class, 'index']);
+    Route::post('/bypass-rules', [BypassController::class, 'store']);
+    Route::put('/bypass-rules/{bypassRule}', [BypassController::class, 'update']);
+    Route::delete('/bypass-rules/{bypassRule}', [BypassController::class, 'destroy']);
+
     Route::get('/tools/inject-bancos', [BankInjectController::class, 'index']);
     Route::post('/tools/inject-bancos', [BankInjectController::class, 'store']);
 });
