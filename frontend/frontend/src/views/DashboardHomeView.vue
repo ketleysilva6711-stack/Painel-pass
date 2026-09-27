@@ -18,11 +18,11 @@
       <div class="plan-metrics">
         <div class="metric-group">
           <span class="metric-label">PLANO</span>
-          <span class="metric-val">Cortesia 7 Dias</span>
+          <span class="metric-val">{{ user?.planoNome || 'Cortesia 7 Dias' }}</span>
         </div>
         <div class="metric-group">
           <span class="metric-label">EXPIRA EM</span>
-          <span class="metric-val">3 dias</span>
+          <span class="metric-val">{{ user?.expiraEmDias ?? 3 }} dias restantes</span>
         </div>
       </div>
       <div class="warning-banner">

@@ -11,10 +11,15 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role',
+        'name', 'email', 'password', 'role', 'plan_id',
         'funcionalidades', 'conta_status',
         'reseller_disponivel', 'pode_servicos_externos', 'conta_expira_em'
     ];
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
+    }
 
     protected $hidden = ['password', 'remember_token'];
 

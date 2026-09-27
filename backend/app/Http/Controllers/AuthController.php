@@ -24,6 +24,8 @@ class AuthController extends Controller
             'resellerDisponivel'    => $user->reseller_disponivel,
             'podeServicosExternos'  => $user->pode_servicos_externos,
             'versao'                => 'v2.0',
+            'planoNome'             => $user->plan?->name ?? 'Plano Cortesia 7 Dias',
+            'expiraEmDias'          => $user->conta_expira_em ? max(0, (int) now()->diffInDays($user->conta_expira_em, false)) : 30,
         ];
     }
 

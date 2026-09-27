@@ -10,6 +10,7 @@ use App\Http\Controllers\PublicAppController;
 Route::get('/health', function () { return response()->json(['status' => 'online', 'service' => 'The Vault API', 'timestamp' => now()]); });
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/c/{slug}', [PublicAppController::class, 'show']);
+Route::get('/q/{id}', [QrCodeController::class, 'redirect']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);

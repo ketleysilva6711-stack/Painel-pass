@@ -14,6 +14,8 @@ class PublicAppController extends Controller
             return response()->json(['message' => 'Aplicativo não encontrado.'], 404);
         }
 
+        $app->increment('downloads');
+
         return response()->json([
             'id'          => $app->id,
             'name'        => $app->name,

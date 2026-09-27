@@ -54,6 +54,14 @@ class QrCodeController extends Controller
         return response()->json(['message' => 'QR Code excluído']);
     }
 
+    public function redirect($id)
+    {
+        $qr = QrCodeLink::findOrFail($id);
+        $qr->increment('scans');
+
+        return redirect()->away($qr->target_url);
+    }
+
     private function authorizeOwner(Request $request, QrCodeLink $item): void
     {
         if ($item->user_id !== $request->user()->id) {
