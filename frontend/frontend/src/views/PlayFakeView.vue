@@ -70,7 +70,7 @@
           <h3>Novo Aplicativo Play Fake</h3>
           <button class="btn-close" @click="showModal = false">✕</button>
         </div>
-        <form @submit.prevent="handleCreateApp">
+        <form @submit.prevent="handleCreateApp" enctype="multipart/form-data">
           <div class="form-group">
             <label>Nome do Aplicativo</label>
             <input v-model="form.name" type="text" placeholder="Ex: Nubank, Banco Inter" required />
@@ -80,8 +80,16 @@
             <input v-model="form.developer" type="text" placeholder="Ex: Nu Pagamentos S.A." required />
           </div>
           <div class="form-group">
-            <label>URL / Link do APK</label>
-            <input v-model="form.apk_url" type="url" placeholder="https://..." required />
+            <label>URL / Link do APK (opcional se enviar arquivo)</label>
+            <input v-model="form.apk_url" type="url" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label>Arquivo APK (máx 50MB)</label>
+            <input type="file" accept=".apk" @change="onApkChange" />
+          </div>
+          <div class="form-group">
+            <label>Ícone (máx 5MB)</label>
+            <input type="file" accept="image/*" @change="onIconChange" />
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" @click="showModal = false">Cancelar</button>
@@ -124,15 +132,36 @@ const loadApps = async () => {
   }
 };
 
+const apkFile = ref<File | null>(null);
+const iconFile = ref<File | null>(null);
+
+const onApkChange = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  apkFile.value = input.files?.[0] || null;
+};
+
+const onIconChange = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  iconFile.value = input.files?.[0] || null;
+};
+
 const handleCreateApp = async () => {
   isSubmitting.value = true;
   try {
-    await axios.post(`${API_URL}/play-fake-apps`, form.value);
+    const data = new FormData();
+    data.append('name', form.value.name);
+    data.append('developer', form.value.developer);
+    if (form.value.apk_url) data.append('apk_url', form.value.apk_url);
+    if (apkFile.value) data.append('apk_file', apkFile.value);
+    if (iconFile.value) data.append('icon_file', iconFile.value);
+    await axios.post(`${API_URL}/play-fake-apps`, data);
     showModal.value = false;
     form.value = { name: '', developer: '', apk_url: '' };
+    apkFile.value = null;
+    iconFile.value = null;
     await loadApps();
-  } catch (err) {
-    alert('Erro ao criar aplicativo.');
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Erro ao criar aplicativo.');
   } finally {
     isSubmitting.value = false;
   }

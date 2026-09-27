@@ -12,6 +12,9 @@ class PlayFakeApp extends Model
         'developer',
         'package_name',
         'apk_url',
+        'file_path',
+        'icon_path',
+        'file_size',
         'slug',
         'status',
     ];
