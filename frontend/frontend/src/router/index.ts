@@ -11,6 +11,8 @@ import AdminDashboardView from '../views/AdminDashboardView.vue';
 import GaleriaTemplatesView from '../views/GaleriaTemplatesView.vue';
 import AdminUsuariosView from '../views/AdminUsuariosView.vue';
 import SuporteView from '../views/SuporteView.vue';
+import ConsultaView from '../views/ConsultaView.vue';
+import RankingView from '../views/RankingView.vue';
 import { useAuthStore } from '../stores/auth';
 
 const PlaceholderView = {
@@ -33,9 +35,9 @@ const routes = [
       { path: 'tools/qr-code',       name: 'qr-code',        component: QrCodeView },
       { path: 'tools/bypass',        name: 'bypass',         component: BypassView },
       { path: 'tools/fura-banco',    name: 'fura-banco',     component: PlaceholderView },
-      { path: 'tools/consulta',      name: 'consulta',       component: PlaceholderView },
-      { path: 'tools/top-rank',      name: 'top-rank',       component: PlaceholderView },
-      { path: 'tools/ranking',       name: 'ranking',        component: PlaceholderView },
+      { path: 'tools/consulta',      name: 'consulta',       component: ConsultaView },
+      { path: 'tools/top-rank',      name: 'top-rank',       component: RankingView },
+      { path: 'tools/ranking',       name: 'ranking',        component: RankingView },
       { path: 'tools/tela-preta',    name: 'tela-preta',     component: GaleriaTemplatesView },
       { path: 'tools/inject-bancos', name: 'inject-bancos',  component: BankInjectView },
       { path: 'tutoriais',           name: 'tutoriais',      component: PlaceholderView },

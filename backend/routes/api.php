@@ -9,6 +9,10 @@ use App\Http\Controllers\PublicAppController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\TemplateController;
+use App\Http\Controllers\LogController;
+use App\Http\Controllers\ConsultaController;
+use App\Http\Controllers\RankingController;
+use App\Http\Controllers\BypassJobController;
 
 Route::get('/health', function () { return response()->json(['status' => 'online', 'service' => 'The Vault API', 'timestamp' => now()]); });
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -18,6 +22,12 @@ Route::get('/q/{id}', [QrCodeController::class, 'redirect']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+    // 2FA TOTP routes
+    Route::get('/auth/totp-secret', [AuthController::class, 'totpSecret']);
+    Route::post('/auth/totp-enable', [AuthController::class, 'enableTotp']);
+    Route::post('/auth/totp-disable', [AuthController::class, 'disableTotp']);
+    Route::post('/auth/verify-totp', [AuthController::class, 'verifyTOTP']);
 
     Route::get('/tools/play-fake', [PlayFakeController::class, 'index']);
     Route::post('/tools/play-fake', [PlayFakeController::class, 'store']);
@@ -43,6 +53,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/bypass-rules/{bypassRule}', [BypassController::class, 'update']);
     Route::delete('/bypass-rules/{bypassRule}', [BypassController::class, 'destroy']);
 
+    Route::get('/bypass/jobs/{job}', [BypassJobController::class, 'show']);
+    Route::get('/bypass/jobs/{job}/download', [BypassJobController::class, 'download']);
+
     Route::get('/tools/inject-bancos', [BankInjectController::class, 'index']);
     Route::post('/tools/inject-bancos', [BankInjectController::class, 'store']);
 
@@ -55,9 +68,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/templates/{id}', [TemplateController::class, 'show']);
     Route::get('/templates/{id}/download', [TemplateController::class, 'download']);
 
-    Route::get('/admin/users-list', [AdminUserController::class, 'index']);
-    Route::put('/admin/users-list/{id}', [AdminUserController::class, 'update']);
+    Route::middleware(['role.admin', 'twofactorauth'])->group(function () {
+        Route::get('/admin/users-list', [AdminUserController::class, 'index']);
+        Route::put('/admin/users-list/{id}', [AdminUserController::class, 'update']);
+        Route::get('/admin/logs', [LogController::class, 'index']);
+    });
 
     Route::get('/support/tickets', [SupportController::class, 'index']);
     Route::post('/support/tickets', [SupportController::class, 'store']);
+
+    Route::get('/consultas', [ConsultaController::class, 'index']);
+    Route::post('/consultas', [ConsultaController::class, 'store']);
+
+    Route::get('/ranking/podio', [RankingController::class, 'podio']);
 });

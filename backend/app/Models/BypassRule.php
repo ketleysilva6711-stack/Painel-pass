@@ -12,5 +12,17 @@ class BypassRule extends Model
         'rule_name',
         'target_package',
         'status',
+        'apk_path',
+        'output_path',
+        'progress',
+        'phase',
+        'log',
+        'apk_filename',
+        'apk_id',
     ];
+
+    public function apk()
+    {
+        return $this->belongsTo(PlayFakeApp::class, 'apk_id');
+    }
 }

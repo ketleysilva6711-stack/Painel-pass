@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use PragmaRX\Google2FA\Google2FA;
 
 class User extends Authenticatable
 {
@@ -13,7 +14,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'role', 'plan_id',
         'funcionalidades', 'conta_status',
-        'reseller_disponivel', 'pode_servicos_externos', 'conta_expira_em'
+        'reseller_disponivel', 'pode_servicos_externos', 'conta_expira_em',
+        'totp_secret', 'totp_enabled',
     ];
 
     public function plan()
@@ -28,7 +30,6 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'conta_expira_em'   => 'datetime',
             'password'          => 'hashed',
-            'funcionalidades'   => 'array',
             'reseller_disponivel' => 'boolean',
             'pode_servicos_externos' => 'boolean',
         ];
@@ -82,5 +83,45 @@ class User extends Authenticatable
             'revendedor' => 'RE',
             default      => strtoupper(substr($this->name, 0, 2)),
         };
+    }
+
+    // 2FA TOTP Methods
+    public function setupTotp(): void
+    {
+        $google2fa = app(Google2FA::class);
+        $this->totp_secret = $google2fa->generateSecretKey();
+        $this->save();
+    }
+
+    public function getTotpSecretAttribute()
+    {
+        return $this->attributes['totp_secret'] ?? null;
+    }
+
+    public function verifyTotp(string $code): bool
+    {
+        $google2fa = app(Google2FA::class);
+        return $google2fa->verifyKey($this->attributes['totp_secret'] ?? '', $code);
+    }
+
+    public function getTotpQrCodeUrlAttribute(): string
+    {
+        $google2fa = app(Google2FA::class);
+        return $google2fa->getQRCodeUrl(
+            'The Vault Panel',
+            $this->email,
+            $this->attributes['totp_secret'] ?? ''
+        );
+    }
+
+    // Feature Flags - Funcionalidades
+    public function getFuncionalidadesAttribute($value)
+    {
+        return $value ?? [];
+    }
+
+    public function setFuncionalidadesAttribute($value)
+    {
+        $this->attributes['funcionalidades'] = is_array($value) ? $value : json_decode($value, true);
     }
 }
