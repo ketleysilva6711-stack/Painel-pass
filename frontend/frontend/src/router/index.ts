@@ -8,6 +8,7 @@ import BypassView from '../views/BypassView.vue';
 import BankInjectView from '../views/BankInjectView.vue';
 import PublicAppView from '../views/PublicAppView.vue';
 import AdminDashboardView from '../views/AdminDashboardView.vue';
+import GaleriaTemplatesView from '../views/GaleriaTemplatesView.vue';
 import { useAuthStore } from '../stores/auth';
 
 const PlaceholderView = {
@@ -33,7 +34,7 @@ const routes = [
       { path: 'tools/consulta',      name: 'consulta',       component: PlaceholderView },
       { path: 'tools/top-rank',      name: 'top-rank',       component: PlaceholderView },
       { path: 'tools/ranking',       name: 'ranking',        component: PlaceholderView },
-      { path: 'tools/tela-preta',    name: 'tela-preta',     component: PlaceholderView },
+      { path: 'tools/tela-preta',    name: 'tela-preta',     component: GaleriaTemplatesView },
       { path: 'tools/inject-bancos', name: 'inject-bancos',  component: BankInjectView },
       { path: 'tutoriais',           name: 'tutoriais',      component: PlaceholderView },
       { path: 'suporte',             name: 'suporte',        component: PlaceholderView },

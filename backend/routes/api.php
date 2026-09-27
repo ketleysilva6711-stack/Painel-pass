@@ -47,4 +47,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/bank-injects', [BankInjectController::class, 'store']);
     Route::put('/bank-injects/{bankInject}', [BankInjectController::class, 'update']);
     Route::delete('/bank-injects/{bankInject}', [BankInjectController::class, 'destroy']);
+
+    Route::get('/templates', [TemplateController::class, 'index']);
+    Route::get('/templates/{id}', [TemplateController::class, 'show']);
+    Route::get('/templates/{id}/download', [TemplateController::class, 'download']);
 });
