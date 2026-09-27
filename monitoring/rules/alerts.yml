@@ -1,0 +1,213 @@
+# alerts.yml - Regras de Alertas do Prometheus
+# Local: monitoring/rules/alerts.yml
+
+groups:
+  - name: the-vault.rules
+    interval: 30s
+    rules:
+      # =============================================================================
+      # INFRASTRUCTURE ALERTS
+      # =============================================================================
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} down"
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+
+      - alert: HostOutOfMemory
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100) < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host out of memory ({{ $value }}% available)"
+          description: "Host {{ $labels.instance }} has less than 10% memory available."
+
+      - alert: HostOutOfDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100) < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host out of disk space ({{ $value }}% available)"
+          description: "Host {{ $labels.instance }} has less than 10% disk space available."
+
+      - alert: HostHighCpuLoad
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host high CPU load ({{ $value }}%)"
+          description: "Host {{ $labels.instance }} CPU load is above 90% for 10 minutes."
+
+      # =============================================================================
+      # CONTAINER ALERTS
+      # =============================================================================
+      - alert: ContainerDown
+        expr: container_up{container!=""} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} down"
+          description: "Container {{ $labels.name }} on {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: ContainerHighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high memory usage ({{ $value | humanizePercentage }})"
+          description: "Container {{ $labels.name }} is using more than 90% of its memory limit."
+
+      - alert: ContainerHighCpuUsage
+        expr: (rate(container_cpu_usage_seconds_total[5m]) / container_spec_cpu_quota / container_spec_cpu_period) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high CPU usage ({{ $value | humanizePercentage }})"
+          description: "Container {{ $labels.name }} is using more than 90% of its CPU quota."
+
+      # =============================================================================
+      # DATABASE ALERTS
+      # =============================================================================
+      - alert: MysqlDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL down"
+          description: "MySQL instance {{ $labels.instance }} is down."
+
+      - alert: MysqlTooManyConnections
+        expr: (mysql_global_status_threads_connected / mysql_global_variables_max_connections) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL too many connections ({{ $value | humanizePercentage }})"
+          description: "MySQL is using more than 80% of available connections."
+
+      - alert: MysqlSlowQueries
+        expr: rate(mysql_global_status_slow_queries[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL high slow query rate"
+          description: "MySQL is experiencing more than 10 slow queries per second."
+
+      # =============================================================================
+      # REDIS ALERTS
+      # =============================================================================
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis down"
+          description: "Redis instance {{ $labels.instance }} is down."
+
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage ({{ $value | humanizePercentage }})"
+          description: "Redis is using more than 90% of available memory."
+
+      # =============================================================================
+      # APPLICATION ALERTS
+      # =============================================================================
+      - alert: ApiHighErrorRate
+        expr: (rate(http_requests_total{job="laravel",status=~"5.."}[5m]) / rate(http_requests_total{job="laravel"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API high error rate ({{ $value | humanizePercentage }})"
+          description: "API error rate is above 5% for 5 minutes."
+
+      - alert: ApiHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="laravel"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API high latency (p95 > 2s)"
+          description: "API p95 latency is above 2 seconds for 5 minutes."
+
+      - alert: ApiHighErrorRate4xx
+        expr: (rate(http_requests_total{job="laravel",status=~"4.."}[5m]) / rate(http_requests_total{job="laravel"}[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API high 4xx error rate ({{ $value | humanizePercentage }})"
+          description: "API 4xx error rate is above 20% for 5 minutes."
+
+      - alert: QueueBacklog
+        expr: laravel_queue_jobs_pending > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue backlog high ({{ $value }} jobs)"
+          description: "Queue has more than 1000 pending jobs."
+
+      - alert: QueueWorkerDown
+        expr: laravel_queue_workers_active == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No queue workers running"
+          description: "No queue workers are currently active."
+
+      - alert: BackupFailed
+        expr: increase(backup_job_failed_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup job failed"
+          description: "At least one backup job failed in the last hour."
+
+      - alert: BackupMissing
+        expr: time() - backup_last_success_timestamp_seconds > 86400
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup missing for 24h"
+          description: "No successful backup in the last 24 hours."
+
+      # =============================================================================
+      # SSL CERTIFICATE ALERTS
+      # =============================================================================
+      - alert: SSLCertificateExpiringSoon
+        expr: ssl_certificate_expiration_timestamp_seconds - time() < 2592000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in less than 30 days."
+
+      - alert: SSLCertificateExpired
+        expr: ssl_certificate_expiration_timestamp_seconds - time() < 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SSL certificate expired"
+          description: "SSL certificate for {{ $labels.instance }} has expired."

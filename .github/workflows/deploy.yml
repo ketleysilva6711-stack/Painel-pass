@@ -1,0 +1,347 @@
+# .github/workflows/deploy.yml - CI/CD Pipeline
+# Local: .github/workflows/deploy.yml
+
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # =============================================================================
+  # TESTS
+  # =============================================================================
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: the_vault_test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, redis, bcmath, zip, gd
+          coverage: xdebug
+
+      - name: Cache Composer packages
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Copy .env
+        run: |
+          cd backend
+          cp .env.example .env
+          sed -i 's/DB_DATABASE=the_vault/DB_DATABASE=the_vault_test/' .env
+          sed -i 's/DB_USERNAME=the_vault/DB_USERNAME=test/' .env
+          sed -i 's/DB_PASSWORD=secret/DB_PASSWORD=test/' .env
+
+      - name: Generate key
+        run: |
+          cd backend
+          php artisan key:generate
+
+      - name: Run migrations
+        run: |
+          cd backend
+          php artisan migrate --force
+
+      - name: Run tests
+        run: |
+          cd backend
+          ./vendor/bin/pest --coverage --min=80
+
+  test-frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend/frontend
+          npm ci
+
+      - name: Run lint
+        run: |
+          cd frontend/frontend
+          npm run lint
+
+      - name: Run tests
+        run: |
+          cd frontend/frontend
+          npm run test -- --run --coverage
+
+      - name: Build
+        run: |
+          cd frontend/frontend
+          npm run build
+
+  # =============================================================================
+  # STATIC ANALYSIS
+  # =============================================================================
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql
+
+      - name: Cache Composer packages
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Run PHPStan
+        run: |
+          cd backend
+          ./vendor/bin/phpstan analyse --level=5 --memory-limit=512M
+
+      - name: Run Pint
+        run: |
+          cd backend
+          ./vendor/bin/pint --test
+
+  # =============================================================================
+  # SECURITY SCAN
+  # =============================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Composer Audit
+        run: |
+          cd backend
+          composer audit --format=json --no-check-publish > audit.json || true
+          cat audit.json
+
+  # =============================================================================
+  # BUILD DOCKER IMAGES
+  # =============================================================================
+  build:
+    name: Build Docker Images
+    needs: [test-backend, test-frontend, static-analysis, security-scan]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for PHP
+        id: meta-php
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/php
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push PHP image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          push: true
+          tags: ${{ steps.meta-php.outputs.tags }}
+          labels: ${{ steps.meta-php.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Nginx
+        id: meta-nginx
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/nginx
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Nginx image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/nginx/Dockerfile
+          push: true
+          tags: ${{ steps.meta-nginx.outputs.tags }}
+          labels: ${{ steps.meta-nginx.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Node
+        id: meta-node
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/node
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Node image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend/frontend
+          file: ./frontend/frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-node.outputs.tags }}
+          labels: ${{ steps.meta-node.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # =============================================================================
+  # DEPLOY
+  # =============================================================================
+  deploy:
+    name: Deploy to Production
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pull latest images
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+      - name: Run database migrations
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T php php artisan migrate --force
+
+      - name: Clear caches
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T php php artisan config:clear
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T php php artisan route:clear
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T php php artisan view:clear
+
+      - name: Deploy containers
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f https://${{ secrets.DOMAIN }}/api/health || exit 1
+
+      - name: Notify success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ✅ Deploy successful!
+            Repository: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref }}
+            URL: https://${{ secrets.DOMAIN }}
+
+      - name: Notify failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ Deploy failed!
+            Repository: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

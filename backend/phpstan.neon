@@ -1,0 +1,74 @@
+# phpstan.neon - PHPStan Configuration
+# Local: backend/phpstan.neon
+
+includes:
+    - ./vendor/laravel/framework/src/Illuminate/Support/Stubs/phpstan.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - app/Http/Controllers
+        - app/Models
+        - app/Jobs
+        - app/Http/Middleware
+        - app/Console/Commands
+        - app/Http/Requests
+        - app/Services
+        - app/Events
+        - app/Listeners
+        - app/Policies
+        - app/Notifications
+        - app/Exceptions
+
+    # Exclude generated files
+    excludes_analyse:
+        - app/Http/Kernel.php
+        - app/Console/Kernel.php
+        - app/Exceptions/Handler.php
+        - app/Providers/*
+        - database/migrations/*
+        - database/seeders/*
+        - routes/*
+
+    # Ignore errors
+    ignoreErrors:
+        - '#Unused parameter.*#'
+        - '#Parameter .* has no value type specified in iterable type array#'
+        - '#Access to an undefined property .*::\$#'
+
+    # Extensions
+    extensions:
+        - Larastan\LarastanExtension
+
+    # Rules
+    checkGenericClassTypeInMethodSignature: true
+    checkFunctionUnusedParameters: false
+    checkDynamicCalls: true
+    checkMagicMethods: true
+    checkStaticMethodSignatures: true
+    checkPropertyInitialization: true
+    checkMissingIteratorValueType: true
+    checkNullsafeOperator: true
+    checkConstructorPromotedProperties: true
+    checkMethodWithNoReturnType: true
+    checkUselessTypeAliases: true
+    checkClassHierarchy: true
+    checkParentCall: true
+    checkExportedTypes: true
+
+    # Type hints
+    checkAlwaysUsedFluentInterface: false
+    checkThisVariableType: true
+    checkNonExistingAttributes: true
+
+    # Bootstrap
+    bootstrapFiles:
+        - bootstrap/app.php
+
+    # Cache
+    cacheDirectory: .phpstan.cache
+
+    # Parallel
+    parallel:
+        maximumNumberOfProcesses: 4
