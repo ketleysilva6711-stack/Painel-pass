@@ -26,6 +26,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tools/qr-code', [QrCodeController::class, 'index']);
     Route::post('/tools/qr-code', [QrCodeController::class, 'store']);
 
+    Route::get('/qr-code-links', [QrCodeController::class, 'index']);
+    Route::post('/qr-code-links', [QrCodeController::class, 'store']);
+    Route::put('/qr-code-links/{qrCodeLink}', [QrCodeController::class, 'update']);
+    Route::delete('/qr-code-links/{qrCodeLink}', [QrCodeController::class, 'destroy']);
+
     Route::get('/tools/bypass', [BypassController::class, 'index']);
     Route::post('/tools/bypass', [BypassController::class, 'store']);
 
