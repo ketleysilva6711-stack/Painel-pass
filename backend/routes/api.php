@@ -16,6 +16,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tools/play-fake', [PlayFakeController::class, 'index']);
     Route::post('/tools/play-fake', [PlayFakeController::class, 'store']);
 
+    Route::get('/play-fake-apps', [PlayFakeController::class, 'index']);
+    Route::post('/play-fake-apps', [PlayFakeController::class, 'store']);
+    Route::put('/play-fake-apps/{playFakeApp}', [PlayFakeController::class, 'update']);
+    Route::delete('/play-fake-apps/{playFakeApp}', [PlayFakeController::class, 'destroy']);
+
     Route::get('/tools/qr-code', [QrCodeController::class, 'index']);
     Route::post('/tools/qr-code', [QrCodeController::class, 'store']);
 
