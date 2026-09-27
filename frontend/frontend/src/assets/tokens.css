@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(.129 .042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(.129 .042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(.129 .042 264.695);
+  --primary: oklch(.208 .042 265.755);
+  --primary-foreground: oklch(.984 .003 247.858);
+  --secondary: oklch(.968 .007 247.896);
+  --secondary-foreground: oklch(.208 .042 265.755);
+  --muted: oklch(.968 .007 247.896);
+  --muted-foreground: oklch(.554 .046 257.417);
+  --accent: oklch(.968 .007 247.896);
+  --accent-foreground: oklch(.208 .042 265.755);
+  --destructive: oklch(.577 .245 27.325);
+  --border: oklch(.929 .013 255.508);
+  --input: oklch(.929 .013 255.508);
+  --ring: oklch(.704 .04 256.788);
+  --radius: .625rem;
+
+  --canvas: var(--background);
+  --surface-1: var(--card);
+  --surface-2: var(--secondary);
+  --surface-3: var(--muted);
+  --ink: var(--foreground);
+  --ink-muted: var(--muted-foreground);
+  --ink-faint: var(--ring);
+  --hairline: var(--border);
+  --hairline-soft: oklch(1 0 0 / 5%);
+  --accent: var(--primary);
+  --accent-hover: oklch(.96 .008 255);
+  --accent-soft: oklch(.929 .013 255.508 / 15%);
+  --success: oklch(.723 .219 142.5);
+  --success-soft: oklch(.723 .219 142.5 / 14%);
+  --warning: oklch(.795 .184 86.05);
+  --warning-soft: oklch(.795 .184 86.05 / 14%);
+  --danger: oklch(.704 .191 22.216);
+  --danger-soft: oklch(.704 .191 22.216 / 14%);
+
+  --role-admin: oklch(.585 .233 277.1);
+  --role-user: oklch(.723 .219 142.5);
+  --role-rev: oklch(.795 .184 86.05);
+
+  --c-emerald: oklch(.723 .219 142.5);
+  --c-violet: oklch(.627 .265 303.9);
+  --c-orange: oklch(.75 .183 55.93);
+  --c-cyan: oklch(.715 .143 215.22);
+  --c-amber: oklch(.795 .184 86.05);
+  --c-teal: oklch(.704 .14 182);
+  --c-indigo: oklch(.585 .233 277.1);
+  --c-rose: oklch(.637 .237 15.34);
+  --c-pink: oklch(.656 .241 354.31);
+  --c-sky: oklch(.685 .154 224.28);
+  --c-lime: oklch(.768 .233 130.85);
+
+  --r-sm: calc(var(--radius) - 4px);
+  --r-md: calc(var(--radius) - 2px);
+  --r-lg: var(--radius);
+  --r-xl: calc(var(--radius) + 4px);
+  --r-pill: 100px;
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Geist", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.dark {
+  --background: oklch(.129 .042 264.695);
+  --foreground: oklch(.984 .003 247.858);
+  --card: oklch(.14 .04 259.21);
+  --card-foreground: oklch(.984 .003 247.858);
+  --popover: oklch(.208 .042 265.755);
+  --popover-foreground: oklch(.984 .003 247.858);
+  --primary: oklch(.929 .013 255.508);
+  --primary-foreground: oklch(.208 .042 265.755);
+  --secondary: oklch(.279 .041 260.031);
+  --secondary-foreground: oklch(.984 .003 247.858);
+  --muted: oklch(.279 .041 260.031);
+  --muted-foreground: oklch(.704 .04 256.788);
+  --accent: oklch(.279 .041 260.031);
+  --accent-foreground: oklch(.984 .003 247.858);
+  --destructive: oklch(.704 .191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(.551 .027 264.364);
+
+  --canvas: var(--background);
+  --surface-1: var(--card);
+  --surface-2: var(--secondary);
+  --surface-3: var(--muted);
+  --ink: var(--foreground);
+  --ink-muted: var(--muted-foreground);
+  --ink-faint: var(--ring);
+  --hairline: var(--border);
+  --accent: var(--primary);
+}
+
+:root {
+  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
+  --shadow-modal: 0 25px 50px -12px rgb(0 0 0 / .25);
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
