@@ -49,8 +49,8 @@ describe('Auth Store', () => {
           access_token: 'test-token-123',
           token_type: 'Bearer',
           user: mockUser
-        }
-      )
+        },
+      })
 
       const authStore = useAuthStore()
       await authStore.login('test@example.com', 'password123')

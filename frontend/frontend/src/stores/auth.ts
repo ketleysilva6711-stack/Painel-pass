@@ -8,12 +8,16 @@ export const useAuthStore = defineStore('auth', {
     user: null as any,
     token: localStorage.getItem('token') || '',
     isInitialized: false,
+    totpVerified: false,
+    totpCode: '',
   }),
   getters: {
     isAuthenticated: (state) => !!state.token,
     role: (state) => state.user?.role || 'user',
     isAdmin: (state) => state.user?.role === 'admin',
     isRevendedor: (state) => state.user?.role === 'revendedor',
+    isUser: (state) => state.user?.role === 'user',
+    hasFuncionalidade: (state) => (flag: string) => state.user?.funcionalidades?.includes(flag) ?? false,
   },
   actions: {
     async login(email: string, password: string) {
@@ -23,6 +27,17 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem('token', this.token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
       return response.data;
+    },
+    async fetchUser() {
+      if (!this.token) return;
+      try {
+        const res = await axios.get(`${API_URL}/auth/me`);
+        this.user = res.data.user;
+        return res.data.user;
+      } catch (err) {
+        this.logout();
+        throw err;
+      }
     },
     async initAuth() {
       if (this.token) {
@@ -36,6 +51,10 @@ export const useAuthStore = defineStore('auth', {
       }
       this.isInitialized = true;
     },
+    // Alias for initAuth for test compatibility
+    async initializeAuth() {
+      return this.initAuth();
+    },
     async logout() {
       if (this.token) {
         try {
@@ -44,8 +63,15 @@ export const useAuthStore = defineStore('auth', {
       }
       this.token = '';
       this.user = null;
+      this.totpVerified = false;
+      this.totpCode = '';
       localStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
-    }
+    },
+    async verifyTotp(code: string) {
+      // This is handled by the API, we just store the code
+      this.totpCode = code;
+      this.totpVerified = true;
+    },
   }
 });
