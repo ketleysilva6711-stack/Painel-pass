@@ -107,6 +107,7 @@ const navGroups = computed(() => {
 
 const hasFuncionalidade = (flag: string) => {
   if (!flag) return true;
+  if (role.value === 'admin') return true;
   return funcionalidades.value.includes(flag);
 };
 

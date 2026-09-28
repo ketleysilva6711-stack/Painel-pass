@@ -12,7 +12,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'plan_id',
+        'name', 'email', 'password', 'role', 'plan_id', 'reseller_id',
         'funcionalidades', 'conta_status',
         'reseller_disponivel', 'pode_servicos_externos', 'conta_expira_em',
         'totp_secret', 'totp_enabled',
@@ -32,6 +32,8 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'reseller_disponivel' => 'boolean',
             'pode_servicos_externos' => 'boolean',
+            'funcionalidades' => 'array',
+            'totp_enabled' => 'boolean',
         ];
     }
 
@@ -114,14 +116,16 @@ class User extends Authenticatable
         );
     }
 
-    // Feature Flags - Funcionalidades
+    // Feature Flags - Funcionalidades (cast array já decodifica; accessor garante array)
     public function getFuncionalidadesAttribute($value)
     {
-        return $value ?? [];
-    }
-
-    public function setFuncionalidadesAttribute($value)
-    {
-        $this->attributes['funcionalidades'] = is_array($value) ? $value : json_decode($value, true);
+        if (is_array($value)) {
+            return $value;
+        }
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        return [];
     }
 }

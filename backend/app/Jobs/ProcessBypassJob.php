@@ -9,7 +9,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class ProcessBypassJob implements ShouldQueue
 {
@@ -21,185 +20,273 @@ class ProcessBypassJob implements ShouldQueue
     public function __construct(BypassRule $rule, $keystorePath = null)
     {
         $this->bypassRule = $rule;
-        $this->keystorePath = $keystorePath ?? '/app/keystore/thevault.keystore';
+        // Keystore configurável: parâmetro > env > padrão (Fase 2, item 5)
+        $this->keystorePath = $keystorePath
+            ?? env('KEYSTORE_PATH', '/app/keystore/thevault.keystore');
+    }
+
+    protected function apktoolJar(): string
+    {
+        return env('APKTOOL_JAR', '/usr/local/bin/apktool.jar');
+    }
+
+    protected function buildToolsDir(): string
+    {
+        $version = env('BUILD_TOOLS_VERSION', '34.0.0');
+        $root = env('ANDROID_SDK_ROOT', '/opt/android-sdk');
+        return rtrim($root, '/') . '/build-tools/' . $version;
     }
 
     public function handle(): void
     {
-        $rule = $this->bypassRule;
-        $apk = $rule->apk;
-        
-        $apkFullPath = storage_path('app/public/' . $apk->file_path);
+        $rule = $this->bypassRule->fresh() ?? $this->bypassRule;
+        $rule->update(['status' => 'processing']);
 
-        if (!$apk || !file_exists($apkFullPath)) {
+        // Resolve APK original: relação apk (file_path) > apk_path salvo na regra
+        $apk = $rule->apk;
+        $relativeApk = $apk?->file_path ?: $rule->apk_path;
+        $apkFullPath = $relativeApk ? storage_path('app/public/' . ltrim($relativeApk, '/')) : null;
+
+        if (!$relativeApk || !$apkFullPath || !is_file($apkFullPath)) {
             $rule->update([
                 'status' => 'failed',
-                'log' => 'APK original não encontrado: ' . ($apkFullPath ?? 'null'),
+                'log' => ($rule->log ?? '') . $this->stamp('APK original não encontrado: ' . ($apkFullPath ?? 'null')),
                 'phase' => 'decompile',
-                'progress' => 0
+                'progress' => 0,
             ]);
             return;
         }
 
+        $apkBase = basename($relativeApk);
         $targetPackage = $rule->target_package;
-        $decompiledDir = storage_path("app/tmp/decompiled_{$rule->id}");
-        $outputApk = "{$decompiledDir}/dist/{$apk->filename}";
-        
-        // Use o caminho completo do APK
-        $apk->path = $apkFullPath;
-        
+        $decompiledDir = storage_path('app/tmp/decompiled_' . $rule->id . '_' . uniqid());
+        $unsignedApk = $decompiledDir . '/dist_unsigned.apk';
+        $alignedApk = $decompiledDir . '/dist_aligned.apk';
+
         try {
-            // ETAPA 1: Descompilar com apktool
-            $this->updateProgress($rule, 'decompile', 10, "Iniciando descompilação do APK...");
-            $this->log($rule, "ETAPA 1: Descompilando APK com apktool...");
-            
+            // ETAPA 1: Descompilar (apktool d -f)
+            $this->updateProgress($rule, 'decompile', 10, 'Iniciando descompilação do APK...');
             if (!is_dir($decompiledDir)) {
                 mkdir($decompiledDir, 0755, true);
             }
-            
-            $result = shell_exec("java -jar /usr/local/bin/apktool.jar d -f \"{$apk->path}\" -o \"{$decompiledDir}\" 2>&1");
-            $this->log($rule, "Resultado descompilação: " . substr($result, 0, 500));
-            
-            if (!file_exists("{$decompiledDir}/AndroidManifest.xml")) {
-                throw new \Exception("Falha ao descompilar APK - AndroidManifest.xml não encontrado");
+
+            $decodeOut = $this->run([
+                'java', '-jar', $this->apktoolJar(),
+                'd', '-f', $apkFullPath, '-o', $decompiledDir,
+            ]);
+            $this->log($rule, 'Resultado descompilação: ' . mb_substr($decodeOut, 0, 800));
+
+            if (!is_file($decompiledDir . '/AndroidManifest.xml')) {
+                throw new \Exception('Falha ao descompilar APK — AndroidManifest.xml não encontrado. Saída: ' . mb_substr($decodeOut, 0, 300));
             }
-            
-            // ETAPA 2: Aplicar patches baseados no target_package
-            $this->updateProgress($rule, 'patch', 30, "Aplicando patches para {$targetPackage}...");
-            $this->log($rule, "ETAPA 2: Aplicando patches para {$targetPackage}...");
-            
-            $this->applyPatches($decompiledDir, $targetPackage);
-            
-            // ETAPA 3: Recompilar com apktool
-            $this->updateProgress($rule, 'recompile', 60, "Recompilando APK...");
-            $this->log($rule, "ETAPA 3: Recompilando APK...");
-            
-            $result = shell_exec("java -jar /usr/local/bin/apktool.jar b \"{$decompiledDir}\" -o \"{$outputApk}\" 2>&1");
-            $this->log($rule, "Resultado recompilação: " . substr($result, 0, 500));
-            
-            if (!file_exists($outputApk)) {
-                throw new \Exception("Falha ao recompilar APK - arquivo de saída não gerado");
+
+            // ETAPA 2: Patch real (1 mudança auditável)
+            $this->updateProgress($rule, 'patch', 30, "Aplicando patch para {$targetPackage}...");
+            $patchDesc = $this->applyPatches($decompiledDir, $targetPackage);
+            $rule->update(['patch_applied' => $patchDesc]);
+            $this->log($rule, 'Patch aplicado: ' . $patchDesc);
+
+            // ETAPA 3: Recompilar (apktool b -o <arquivo>)
+            $this->updateProgress($rule, 'recompile', 55, 'Recompilando APK...');
+            $buildOut = $this->run([
+                'java', '-jar', $this->apktoolJar(),
+                'b', $decompiledDir, '-o', $unsignedApk,
+            ]);
+            $this->log($rule, 'Resultado recompilação: ' . mb_substr($buildOut, 0, 800));
+
+            if (!is_file($unsignedApk)) {
+                // Fallback: procurar qualquer APK gerado
+                $found = glob($decompiledDir . '/dist/*.apk') ?: [];
+                if (empty($found)) {
+                    throw new \Exception('Falha ao recompilar APK — arquivo de saída não gerado.');
+                }
+                $unsignedApk = $found[0];
+                $this->log($rule, 'APK recompilado encontrado em: ' . $unsignedApk);
             }
-            
-            // ETAPA 4: Assinar com apksigner
-            $this->updateProgress($rule, 'sign', 80, "Assinando APK com apksigner...");
-            $this->log($rule, "ETAPA 4: Assinando APK com apksigner...");
-            
+
+            // ETAPA 4: Alinhar (zipalign -f 4)
+            $this->updateProgress($rule, 'align', 70, 'Alinhando APK com zipalign...');
+            $zipalign = $this->buildToolsDir() . '/zipalign';
+            if (!is_file($zipalign)) {
+                throw new \Exception('zipalign não encontrado em: ' . $zipalign . ' (verifique BUILD_TOOLS_VERSION)');
+            }
+            $alignOut = $this->run([$zipalign, '-f', '4', $unsignedApk, $alignedApk]);
+            $this->log($rule, 'Resultado zipalign: ' . mb_substr($alignOut, 0, 500));
+            if (!is_file($alignedApk)) {
+                throw new \Exception('Falha no zipalign — saída não gerada.');
+            }
+
+            // ETAPA 5: Assinar (apksigner, keystore configurável)
+            $this->updateProgress($rule, 'sign', 85, 'Assinando APK com apksigner...');
             $keystore = $this->keystorePath;
-            
-            if (!file_exists($keystore)) {
-                throw new \Exception("Keystore não encontrado em: {$keystore}");
+            if (!is_file($keystore)) {
+                throw new \Exception('Keystore não encontrado em: ' . $keystore . ' (configure KEYSTORE_PATH)');
             }
-            
-            $signedApk = $outputApk . '.signed';
-            $signResult = shell_exec("/opt/android-sdk/build-tools/34.0.0/apksigner sign --out \"{$signedApk}\" --ks \"{$keystore}\" --ks-key-alias thevault --ks-pass pass:vault2024 --key-pass pass:vault2024 \"{$outputApk}\" 2>&1");
-            $this->log($rule, "Resultado assinatura: " . substr($signResult, 0, 500));
-            
-            if (!file_exists($signedApk) || str_contains($signResult, 'ERROR') || str_contains($signResult, 'failed')) {
-                throw new \Exception("Falha na assinatura: " . $signResult);
+            $alias = env('KEYSTORE_ALIAS', 'thevault');
+            $ksPass = env('KEYSTORE_PASS', 'vault2024');
+            $keyPass = env('KEY_PASS', 'vault2024');
+            $apksigner = $this->buildToolsDir() . '/apksigner';
+
+            $signedTmp = $decompiledDir . '/dist_signed.apk';
+            $signOut = $this->run([
+                $apksigner, 'sign',
+                '--out', $signedTmp,
+                '--ks', $keystore,
+                '--ks-key-alias', $alias,
+                '--ks-pass', 'pass:' . $ksPass,
+                '--key-pass', 'pass:' . $keyPass,
+                $alignedApk,
+            ]);
+            $this->log($rule, 'Resultado assinatura: ' . mb_substr($signOut, 0, 800));
+            if (!is_file($signedTmp)) {
+                throw new \Exception('Falha na assinatura: ' . mb_substr($signOut, 0, 500));
             }
-            
-            // Mover arquivo assinado para lugar definitivo
-            $finalPath = storage_path("app/public/bypass_output/{$rule->id}_{$apk->filename}.signed");
-            $finalDir = dirname($finalPath);
-            if (!is_dir($finalDir)) {
-                mkdir($finalDir, 0755, true);
+
+            // ETAPA 6: Verificar (apksigner verify --print-certs)
+            $verifyOut = $this->run([$apksigner, 'verify', '--print-certs', $signedTmp]);
+            $this->log($rule, 'Verificação assinatura: ' . mb_substr($verifyOut, 0, 1000));
+            if (stripos($verifyOut, 'ERROR') !== false || stripos($verifyOut, 'FAILED') !== false) {
+                throw new \Exception('Assinatura inválida: ' . mb_substr($verifyOut, 0, 500));
             }
-            rename($signedApk, $finalPath);
-            
-            // Verificar assinatura
-            $verifyResult = shell_exec("/opt/android-sdk/build-tools/34.0.0/apksigner verify \"{$finalPath}\" 2>&1");
-            $this->log($rule, "Verificação assinatura: " . $verifyResult);
-            
-            // Limpar diretório temporário
+
+            // Persistir artefato final (caminho RELATIVO ao disco public)
+            $finalName = $rule->id . '_' . pathinfo($apkBase, PATHINFO_FILENAME) . '.signed.apk';
+            $finalRelative = 'bypass_output/' . $finalName;
+            $finalFull = storage_path('app/public/' . $finalRelative);
+            if (!is_dir(dirname($finalFull))) {
+                mkdir(dirname($finalFull), 0755, true);
+            }
+            if (!@rename($signedTmp, $finalFull)) {
+                copy($signedTmp, $finalFull);
+                @unlink($signedTmp);
+            }
+
             $this->cleanupDirectory($decompiledDir);
-            
-            // Atualizar registro no banco - SUCESSO
+
             $rule->update([
                 'status' => 'completed',
-                'output_path' => $finalPath,
+                'output_path' => $finalRelative,
                 'phase' => 'completed',
                 'progress' => 100,
-                'log' => 'Bypass processado com sucesso. APK assinado e pronto para download.'
             ]);
-            
-            $this->log($rule, "✅ Job concluído com sucesso! APK disponível em: {$finalPath}");
-            
+            $this->log($rule, '✅ Job concluído! APK em: ' . $finalRelative);
+
         } catch (\Exception $e) {
-            $this->log($rule, "❌ ERRO: " . $e->getMessage());
-            
+            $this->log($rule, '❌ ERRO: ' . $e->getMessage());
             $rule->update([
                 'status' => 'failed',
                 'phase' => $rule->phase ?? 'decompile',
                 'progress' => 0,
-                'log' => 'Erro: ' . $e->getMessage()
             ]);
-            
-            // Limpar em caso de erro
-            if (is_dir($decompiledDir)) {
+            if (isset($decompiledDir) && is_dir($decompiledDir)) {
                 $this->cleanupDirectory($decompiledDir);
             }
         }
     }
-    
-    protected function applyPatches(string $decompiledDir, string $targetPackage): void
+
+    /**
+     * Patch real e auditável (1 mudança): define android:debuggable="true"
+     * no <application> do AndroidManifest.xml decodificado.
+     * Retorna descrição verificável do que foi alterado.
+     */
+    protected function applyPatches(string $decompiledDir, string $targetPackage): string
     {
-        $manifestPath = "{$decompiledDir}/AndroidManifest.xml";
-        
-        if (!file_exists($manifestPath)) {
-            return;
+        $manifestPath = $decompiledDir . '/AndroidManifest.xml';
+
+        if (!is_file($manifestPath)) {
+            throw new \Exception('AndroidManifest.xml não encontrado para patch.');
         }
-        
+
         $content = file_get_contents($manifestPath);
-        
-        // Exemplo de patch: alterar package name no manifest se necessário
-        // Lógica real de patches seria implementada aqui baseada no $targetPackage
-        // Por enquanto, apenas log
-        $this->log($this->bypassRule, "Patches aplicados para {$targetPackage} (placeholder)");
-        
-        // Exemplo: injetar permissões específicas
-        // $content = str_replace('<manifest', '<manifest xmlns:android="http://schemas.android.com/apk/res/android"', $content);
-        // file_put_contents($manifestPath, $content);
+        if ($content === false) {
+            throw new \Exception('Não foi possível ler AndroidManifest.xml.');
+        }
+
+        $before = $content;
+
+        // 1) Se já existe android:debuggable, força para true
+        if (preg_match('/android:debuggable\s*=\s*"(true|false)"/i', $content)) {
+            $content = preg_replace(
+                '/android:debuggable\s*=\s*"(true|false)"/i',
+                'android:debuggable="true"',
+                $content
+            );
+            $desc = 'android:debuggable forçado para "true"';
+        } else {
+            // 2) Injeta no <application ...>
+            if (!preg_match('/<application\b[^>]*>/', $content)) {
+                throw new \Exception('Tag <application> não encontrada no manifest.');
+            }
+            $content = preg_replace(
+                '/<application\b([^>]*)>/',
+                '<application$1 android:debuggable="true">',
+                $content,
+                1
+            );
+            $desc = 'android:debuggable="true" injetado em <application>';
+        }
+
+        if ($content === $before) {
+            throw new \Exception('Patch não alterou o manifest (conteúdo idêntico).');
+        }
+
+        file_put_contents($manifestPath, $content);
+
+        // Verificação pós-patch
+        $check = file_get_contents($manifestPath);
+        if (strpos($check, 'android:debuggable="true"') === false) {
+            throw new \Exception('Verificação do patch falhou: debuggable não encontrado após escrita.');
+        }
+
+        return $desc . " (target: {$targetPackage})";
     }
-    
+
+    /**
+     * Executa comando com argumentos escapados (sem interpolação shell).
+     */
+    protected function run(array $args): string
+    {
+        $escaped = array_map(fn ($a) => escapeshellarg((string) $a), $args);
+        $cmd = implode(' ', $escaped) . ' 2>&1';
+        $out = shell_exec($cmd);
+        return (string) ($out ?? '');
+    }
+
+    protected function stamp(string $message): string
+    {
+        return '[' . now()->format('Y-m-d H:i:s') . '] ' . $message . "\n";
+    }
+
     protected function updateProgress(BypassRule $rule, string $phase, int $progress, string $message): void
     {
-        $rule->update([
-            'phase' => $phase,
-            'progress' => $progress,
-        ]);
+        $rule->update(['phase' => $phase, 'progress' => $progress]);
         $this->log($rule, $message);
     }
-    
+
     protected function log(BypassRule $rule, string $message): void
     {
-        $timestamp = now()->format('Y-m-d H:i:s');
-        $logEntry = "[{$timestamp}] {$message}\n";
-        
-        $rule->update([
-            'log' => ($rule->log ?? '') . $logEntry
-        ]);
-        
+        $fresh = $rule->fresh() ?? $rule;
+        $fresh->update(['log' => ($fresh->log ?? '') . $this->stamp($message)]);
         Log::info("ProcessBypassJob [{$rule->id}]: {$message}");
     }
-    
+
     protected function cleanupDirectory(string $dir): void
     {
-        if (!is_dir($dir)) return;
-        
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
-        );
-        
-        foreach ($files as $file) {
-            if ($file->isDir()) {
-                rmdir($file->getRealPath());
-            } else {
-                unlink($file->getRealPath());
-            }
+        if (!is_dir($dir)) {
+            return;
         }
-        
-        rmdir($dir);
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($iterator as $file) {
+            $files[] = $file;
+        }
+        foreach ($files as $file) {
+            $path = $file->getRealPath() ?: $file->getPathname();
+            $file->isDir() ? @rmdir($path) : @unlink($path);
+        }
+        @rmdir($dir);
     }
 }

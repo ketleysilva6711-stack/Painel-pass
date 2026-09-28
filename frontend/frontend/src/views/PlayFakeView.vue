@@ -27,9 +27,9 @@
 
         <div class="form-group">
           <label>Arquivo APK *</label>
-          <div class="file-upload" @click="triggerFile" :class="{ 'has-file': form.file }" @dragover.prevent @drop.prevent="handleDrop">
+          <div class="file-upload" @click="triggerFile" :class="{ 'has-file': form.apk_file }" @dragover.prevent @drop.prevent="handleDrop">
             <input type="file" ref="fileInput" accept=".apk" @change="handleFile" style="display: none" />
-            <div v-if="!form.file" class="upload-placeholder">
+            <div v-if="!form.apk_file" class="upload-placeholder">
               <svg class="upload-icon" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
               </svg>
@@ -43,8 +43,8 @@
                   <path d="M14 2v6h6"/>
                 </svg>
                 <div class="file-details">
-                  <span class="file-name">{{ form.file?.name }}</span>
-                  <span class="file-size">{{ formatSize(form.file?.size) }}</span>
+                  <span class="file-name">{{ form.apk_file?.name }}</span>
+                  <span class="file-size">{{ formatSize(form.apk_file?.size) }}</span>
                 </div>
               </div>
               <button type="button" class="btn btn-sm btn-secondary" @click="removeFile">Remover</button>
@@ -70,7 +70,7 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-lg" :disabled="submitting || !form.file">
+        <button type="submit" class="btn btn-primary btn-lg" :disabled="submitting || !form.apk_file">
           {{ submitting ? 'Publicando...' : '🚀 Publicar APK' }}
         </button>
       </form>
@@ -153,7 +153,7 @@ const form = ref({
   developer: '',
   package_name: '',
   apk_url: '',
-  file: null as File | null,
+  apk_file: null as File | null,
   icon: null as File | null,
 });
 
@@ -189,7 +189,7 @@ const formatSize = (bytes: number) => {
 const loadApps = async () => {
   loadingApps.value = true;
   try {
-    const res = await axios.get(`${API_URL}/play-fake-apps`, {
+    const res = await axios.get(`${API_URL}/tools/play-fake`, {
       headers: { Authorization: `Bearer ${authStore.token}` },
     });
     apps.value = res.data.data || res.data.apps || res.data || [];
@@ -217,28 +217,28 @@ const handleFile = (e: Event) => {
       alert('Arquivo muito grande. Máximo 100MB');
       return;
     }
-    form.value.file = file;
-  }
+form.value.apk_file = file;
+   }
 };
 
 const handleDrop = (e: DragEvent) => {
-  e.preventDefault();
-  if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
-    const file = e.dataTransfer.files[0];
-    if (!file.name.endsWith('.apk')) {
-      alert('Apenas arquivos .apk são permitidos');
-      return;
-    }
-    if (file.size > 100 * 1024 * 1024) {
-      alert('Arquivo muito grande. Máximo 100MB');
-      return;
-    }
-    form.value.file = file;
-  }
+   e.preventDefault();
+   if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
+     const file = e.dataTransfer.files[0];
+     if (!file.name.endsWith('.apk')) {
+       alert('Apenas arquivos .apk são permitidos');
+       return;
+     }
+     if (file.size > 100 * 1024 * 1024) {
+       alert('Arquivo muito grande. Máximo 100MB');
+       return;
+     }
+     form.value.apk_file = file;
+   }
 };
 
 const removeFile = () => {
-  form.value.file = null;
+   form.value.apk_file = null;
 };
 
 const handleIcon = (e: Event) => {
@@ -249,7 +249,7 @@ const handleIcon = (e: Event) => {
 };
 
 const uploadApk = async () => {
-  if (!form.value.file || !form.value.name) {
+  if (!form.value.apk_file || !form.value.name) {
     alert('Nome e arquivo APK são obrigatórios');
     return;
   }
@@ -264,10 +264,10 @@ const uploadApk = async () => {
     formData.append('developer', form.value.developer || '');
     formData.append('package_name', form.value.package_name || '');
     formData.append('apk_url', form.value.apk_url || '');
-    if (form.value.file) formData.append('file', form.value.file);
+    if (form.value.apk_file) formData.append('apk_file', form.value.apk_file);
     if (form.value.icon) formData.append('icon', form.value.icon);
 
-    await axios.post(`${API_URL}/play-fake-apps`, formData, {
+    await axios.post(`${API_URL}/tools/play-fake`, formData, {
       headers: { 
         Authorization: `Bearer ${authStore.token}`,
         'Content-Type': 'multipart/form-data'
@@ -282,7 +282,7 @@ const uploadApk = async () => {
 
     uploadProgress.value = 100;
     uploadStatus.value = 'Concluído!';
-    form.value = { name: '', developer: '', package_name: '', apk_url: '', file: null, icon: null };
+    form.value = { name: '', developer: '', package_name: '', apk_url: '', apk_file: null, icon: null };
     await loadApps();
     alert('APK publicado com sucesso!');
   } catch (e: any) {

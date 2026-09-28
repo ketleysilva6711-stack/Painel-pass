@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'consulta' => [
+        'provider' => env('CONSULTA_PROVIDER', 'local'),
+        'url' => env('CONSULTA_API_URL'),
+        'key' => env('CONSULTA_API_KEY'),
+    ],
+
 ];

@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\LogAction::class);
         $middleware->alias([
             'role.admin' => \App\Http\Middleware\RoleAdmin::class,
+            'role.revendedor' => \App\Http\Middleware\RoleRevendedor::class,
             'twofactorauth' => \App\Http\Middleware\TwoFactorAuth::class,
         ]);
     })

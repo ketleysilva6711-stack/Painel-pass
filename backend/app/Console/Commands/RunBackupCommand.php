@@ -44,9 +44,9 @@ class RunBackupCommand extends Command
             return self::FAILURE;
         }
         
-        // Comprimir o backup
+        // Comprimir o backup (caminho escapado — evita quebra/injeção)
         $gzPath = "{$filePath}.gz";
-        $gzipOutput = shell_exec("gzip {$filePath} 2>&1");
+        $gzipOutput = shell_exec('gzip ' . escapeshellarg($filePath) . ' 2>&1');
         
         if (!file_exists($gzPath)) {
             $this->error('Falha ao comprimir backup');

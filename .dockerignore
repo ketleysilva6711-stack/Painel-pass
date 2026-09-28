@@ -1,0 +1,14 @@
+# Symlink do Laravel (aponta para ../storage/app/public) — quebra o build context do BuildKit
+backend/public/storage
+# Ignorar dependências e artefatos locais (o runtime usa bind-mount de ./backend)
+backend/vendor
+backend/node_modules
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/.env
+frontend/frontend/node_modules
+frontend/frontend/dist
+.git
+backup/

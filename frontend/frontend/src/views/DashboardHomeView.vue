@@ -177,7 +177,7 @@ const latestApps = ref<any[]>([]);
 
 const loadData = async () => {
   try {
-    const resApps = await axios.get(`${API_URL}/play-fake-apps`);
+    const resApps = await axios.get(`${API_URL}/tools/play-fake`);
     const appsList = resApps.data.data || resApps.data || [];
     appsCount.value = appsList.length;
     latestApps.value = appsList.slice(0, 5);

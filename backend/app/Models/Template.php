@@ -5,6 +5,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Template extends Model
 {
-    protected $fillable = ['title', 'galeria', 'description', 'html', 'thumb', 'active'];
-    protected $casts = ['active' => 'boolean'];
+    protected $fillable = ['title', 'galeria', 'description', 'html', 'thumb', 'active', 'version'];
+    protected $casts = ['active' => 'boolean', 'version' => 'integer'];
 }

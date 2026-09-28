@@ -17,6 +17,7 @@ class BypassRule extends Model
         'progress',
         'phase',
         'log',
+        'patch_applied',
         'apk_filename',
         'apk_id',
     ];

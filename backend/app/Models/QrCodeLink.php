@@ -10,6 +10,20 @@ class QrCodeLink extends Model
         'user_id',
         'title',
         'target_url',
+        'qr_path',
         'scans',
     ];
+
+    protected $appends = ['qr_url'];
+
+    public function getQrUrlAttribute(): ?string
+    {
+        if (!empty($this->qr_path)) {
+            return url('storage/' . $this->qr_path);
+        }
+        if (!empty($this->id)) {
+            return url('/api/q/' . $this->id . '.png');
+        }
+        return null;
+    }
 }

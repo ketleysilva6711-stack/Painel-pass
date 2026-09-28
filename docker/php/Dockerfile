@@ -3,7 +3,9 @@
 ENV MAKEFLAGS="-j1"
 
 # Instalar dependências base + Java 17 + mysql-client (para mysqldump)
-RUN apk add --no-cache bash curl git unzip libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev oniguruma-dev icu-dev linux-headers $PHPIZE_DEPS \
+# gcompat/libc6-compat: Android SDK build-tools (zipalign/aapt) são ELF glibc,
+# precisam do loader em Alpine/musl — sem isso zipalign falha com "not found".
+RUN apk add --no-cache bash curl git unzip libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev oniguruma-dev icu-dev linux-headers gcompat libc6-compat $PHPIZE_DEPS \
     openjdk17-jdk \
     mysql-client
 
@@ -35,7 +37,7 @@ RUN pecl install redis && docker-php-ext-enable redis
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/memory.ini && echo "upload_max_filesize=20M" > /usr/local/etc/php/conf.d/upload.ini && echo "post_max_size=20M" > /usr/local/etc/php/conf.d/post.ini && echo "max_execution_time=300" > /usr/local/etc/php/conf.d/timeout.ini && echo "date.timezone=America/Sao_Paulo" > /usr/local/etc/php/conf.d/timezone.ini
+RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/memory.ini && echo "upload_max_filesize=55M" > /usr/local/etc/php/conf.d/upload.ini && echo "post_max_size=55M" > /usr/local/etc/php/conf.d/post.ini && echo "max_execution_time=300" > /usr/local/etc/php/conf.d/timeout.ini && echo "date.timezone=America/Sao_Paulo" > /usr/local/etc/php/conf.d/timezone.ini
 
 RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini && echo "opcache.interned_strings_buffer=16" >> /usr/local/etc/php/conf.d/opcache.ini && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/opcache.ini && echo "opcache.revalidate_freq=0" >> /usr/local/etc/php/conf.d/opcache.ini && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
 
