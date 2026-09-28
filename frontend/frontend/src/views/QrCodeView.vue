@@ -278,6 +278,7 @@
           <div class="history-preview">
             <img :src="item.dataUrl" alt="" width="60" height="60" />
           </div>
+          <button v-if="item.serverId" class="history-delete" title="Excluir do servidor" @click.stop="deleteServerItem(item, index)">✕</button>
           <div class="history-info">
             <span class="history-type">{{ typeLabel(item.type) }}</span>
             <span class="history-time">{{ formatTime(item.timestamp) }}</span>
@@ -292,6 +293,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import QRCode from 'qrcode';
+import axios from 'axios';
+import { useAuthStore } from '../stores/auth';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/api';
+const authStore = useAuthStore();
+const authHeaders = () => ({ Authorization: `Bearer ${authStore.token}` });
 
 const generating = ref(false);
 const qrDataUrl = ref('');
@@ -447,6 +454,65 @@ const addToHistory = () => {
   history.value.unshift(item);
   if (history.value.length > 20) history.value.pop();
   localStorage.setItem('qr_history', JSON.stringify(history.value.slice(0, 20)));
+  // Persiste no backend quando é URL válida (contrato: title + target_url)
+  persistToServer(item);
+};
+
+// Salva no Laravel (/qr-code-links) de forma não-bloqueante: o gerador
+// local continua funcionando mesmo se o backend falhar.
+const persistToServer = async (item: any) => {
+  try {
+    if (item.type !== 'url' || !/^https?:\/\/.+/i.test(item.content)) return;
+    const res = await axios.post(`${API_URL}/qr-code-links`, {
+      title: `QR ${new Date(item.timestamp).toLocaleString('pt-BR')}`,
+      target_url: item.content,
+    }, { headers: authHeaders() });
+    const saved = res.data?.item;
+    if (saved?.id) {
+      item.serverId = saved.id;
+      item.dataUrl = saved.qr_url || `${API_URL}/q/${saved.id}.png`;
+      localStorage.setItem('qr_history', JSON.stringify(history.value.slice(0, 20)));
+    }
+  } catch (e) {
+    console.warn('QR não persistido no servidor (modo local):', e);
+  }
+};
+
+const loadServerHistory = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/qr-code-links`, { headers: authHeaders() });
+    const list = res.data?.data || res.data?.items || res.data || [];
+    if (!Array.isArray(list)) return;
+    const known = new Set(history.value.map((h: any) => h.serverId).filter(Boolean));
+    const serverItems = list
+      .filter((s: any) => s && s.id && !known.has(s.id))
+      .map((s: any) => ({
+        type: 'url',
+        content: s.target_url,
+        dataUrl: s.qr_url || `${API_URL}/q/${s.id}.png`,
+        timestamp: s.created_at ? new Date(s.created_at).getTime() : Date.now(),
+        serverId: s.id,
+      }));
+    history.value = [...serverItems, ...history.value].slice(0, 20);
+  } catch (e) {
+    console.warn('Histórico do servidor indisponível (modo local):', e);
+  }
+};
+
+const deleteServerItem = async (item: any, index: number) => {
+  if (!item.serverId) {
+    history.value.splice(index, 1);
+    localStorage.setItem('qr_history', JSON.stringify(history.value.slice(0, 20)));
+    return;
+  }
+  if (!confirm('Excluir este QR do servidor?')) return;
+  try {
+    await axios.delete(`${API_URL}/qr-code-links/${item.serverId}`, { headers: authHeaders() });
+    history.value.splice(index, 1);
+    localStorage.setItem('qr_history', JSON.stringify(history.value.slice(0, 20)));
+  } catch (e) {
+    alert('Erro ao excluir QR do servidor.');
+  }
 };
 
 const copyToClipboard = async () => {
@@ -521,6 +587,7 @@ onMounted(() => {
       localStorage.removeItem('qr_history');
     }
   }
+  loadServerHistory();
 });
 </script>
 
@@ -561,8 +628,10 @@ onMounted(() => {
 .history-section { padding: 1.5rem; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
-.history-item { display: flex; gap: 1rem; padding: 1rem; background: var(--surface-2); border-radius: var(--r-sm); cursor: pointer; transition: all 0.2s; }
+.history-item { display: flex; gap: 1rem; padding: 1rem; background: var(--surface-2); border-radius: var(--r-sm); cursor: pointer; transition: all 0.2s; position: relative; }
 .history-item:hover { background: var(--surface-3); }
+.history-delete { position: absolute; top: 4px; right: 4px; background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; }
+.history-delete:hover { background: var(--surface-3); color: var(--ink); }
 .history-preview { flex-shrink: 0; }
 .history-preview img { border-radius: var(--r-sm); border: 1px solid var(--hairline); background: white; }
 .history-info { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }

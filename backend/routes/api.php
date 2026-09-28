@@ -128,6 +128,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin middleware group
     Route::middleware(['role.admin', 'twofactorauth'])->group(function () {
         Route::get('/admin/users-list', [AdminUserController::class, 'index']);
+        Route::post('/admin/users-list', [AdminUserController::class, 'store']);
         Route::put('/admin/users-list/{id}', [AdminUserController::class, 'update']);
         Route::get('/admin/logs', [LogController::class, 'index']);
 

@@ -1,8 +1,10 @@
 <template>
   <div class="page-container">
-    <div class="detail-layout">
+    <div v-if="isLoading" class="loading-state">Carregando template...</div>
+    <div v-else-if="!template" class="empty-state">Template não encontrado.</div>
+    <div v-else class="detail-layout">
       <div class="preview-section">
-        <iframe :srcdoc="template.html" class="preview-iframe" sandbox=""></iframe>
+        <iframe :srcdoc="template.html || ''" class="preview-iframe" sandbox=""></iframe>
       </div>
 
       <div class="info-section">
@@ -10,8 +12,8 @@
         <p class="detail-description">{{ template.description }}</p>
         <div class="detail-meta">
           <span class="meta-item">Criado em: {{ formattedDate }}</span>
-          <span class="meta-item">Autor: {{ template.author }}</span>
-          <span class="meta-item">Categoria: {{ template.category }}</span>
+          <span class="meta-item">Galeria: {{ template.galeria || template.category || '—' }}</span>
+          <span class="meta-item">Versão: v{{ template.version || 1 }}</span>
         </div>
       </div>
 
@@ -53,9 +55,11 @@ const loadTemplate = async () => {
     const id = route.params.id as string
     templateId.value = id
     const res = await axios.get(`${API_URL}/templates/${id}`, authHeaders())
-    template.value = res.data
-    const date = new Date(res.data.created_at || res.data.created)
-    formattedDate.value = date.toLocaleDateString('pt-BR')
+    const tpl = res.data.data || res.data.item || res.data
+    template.value = tpl
+    const rawDate = tpl?.created_at || tpl?.created
+    const date = rawDate ? new Date(rawDate) : null
+    formattedDate.value = date && !isNaN(date.getTime()) ? date.toLocaleDateString('pt-BR') : '—'
   } catch (err) {
     console.error('Erro ao carregar template:', err)
   } finally {
@@ -64,6 +68,10 @@ const loadTemplate = async () => {
 }
 
 const copyHtml = async () => {
+  if (!template.value?.html) {
+    alert('Nada para copiar: template ainda carregando.')
+    return
+  }
   try {
     await navigator.clipboard.writeText(template.value.html)
     alert('Código HTML copiado para a área de transferência!')

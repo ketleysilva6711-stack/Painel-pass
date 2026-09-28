@@ -88,7 +88,7 @@ const loadRanking = async () => {
   loading.value = true;
   try {
     const headers: Record<string, string> = { Authorization: `Bearer ${authStore.token}` };
-    const res = await axios.get(`${API_URL}/api/ranking/podio`, { headers });
+    const res = await axios.get(`${API_URL}/ranking/podio`, { headers });
     rankings.value = res.data.data || res.data || [];
   } catch (e) {
     console.error('Erro ao carregar ranking:', e);

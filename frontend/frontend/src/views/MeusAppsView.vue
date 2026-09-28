@@ -70,7 +70,7 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-lg" :disabled="submitting || !form.apk_file">
+        <button type="submit" class="btn btn-primary btn-lg" :disabled="submitting || (!form.apk_file && !form.apk_url)">
           {{ submitting ? 'Publicando...' : '🚀 Publicar APK' }}
         </button>
       </form>
@@ -249,8 +249,8 @@ const handleIcon = (e: Event) => {
 };
 
 const uploadApk = async () => {
-  if (!form.value.apk_file || !form.value.name) {
-    alert('Nome e arquivo APK são obrigatórios');
+  if (!form.value.name || (!form.value.apk_file && !form.value.apk_url)) {
+    alert('Nome e (arquivo APK ou URL do APK) são obrigatórios');
     return;
   }
 
@@ -261,11 +261,11 @@ const uploadApk = async () => {
   try {
     const formData = new FormData();
     formData.append('name', form.value.name);
-    formData.append('developer', form.value.developer || '');
-    formData.append('package_name', form.value.package_name || '');
-    formData.append('apk_url', form.value.apk_url || '');
+    if (form.value.developer) formData.append('developer', form.value.developer);
+    if (form.value.package_name) formData.append('package_name', form.value.package_name);
+    if (form.value.apk_url) formData.append('apk_url', form.value.apk_url);
     if (form.value.apk_file) formData.append('apk_file', form.value.apk_file);
-    if (form.value.icon) formData.append('icon', form.value.icon);
+    if (form.value.icon) formData.append('icon_file', form.value.icon);
 
     await axios.post(`${API_URL}/tools/play-fake`, formData, {
       headers: { 
@@ -295,7 +295,8 @@ const uploadApk = async () => {
 };
 
 const viewPublic = (slug: string) => {
-  window.open(`${window.location.origin}/c/${slug}`, '_blank');
+  // Página pública servida pelo backend (nginx :80), não pelo Vite :5173
+  window.open(`${API_URL.replace('/api', '')}/c/${slug}`, '_blank');
 };
 
 const downloadApk = async (app: any) => {

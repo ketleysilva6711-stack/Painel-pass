@@ -79,14 +79,13 @@ export const navAdmin: NavGroup[] = [
     eyebrow: 'PLAY FAKE',
     items: [
       { label: 'Apps',             to: '/admin/apps',              flag: 'play-fake', color: '#38bdf8', icon: 'package' },
-      { label: 'Domínios',         to: '/admin/dominios',          flag: 'admin', color: '#a855f7', icon: 'globe' },
     ]
   },
   {
     eyebrow: 'CONTEÚDO',
     items: [
       { label: 'Tela Preta',        to: '/admin/templates',        flag: 'screen-troll', color: '#34d399', icon: 'template' },
-      { label: 'Inject Bancos',     to: '/admin/templates',        flag: 'inject-banco', color: '#a855f7', icon: 'inject' },
+      { label: 'Inject Bancos',     to: '/fura-banco',             flag: 'fura-banco',   color: '#a855f7', icon: 'inject' },
       { label: 'Tutoriais',         to: '/admin/tutoriais',        flag: 'admin', color: '#fb7185', icon: 'tutorial' },
       { label: 'Novo Tutorial',     to: '/admin/tutoriais/novo',   flag: 'admin', color: '#fb7185', icon: 'tutorial-plus' },
     ]
@@ -95,7 +94,7 @@ export const navAdmin: NavGroup[] = [
     eyebrow: 'SISTEMA',
     items: [
       { label: 'Gestão Top Rank',      to: '/admin/top-rank',         flag: 'ranking', color: '#f5a623', icon: 'toprank' },
-      { label: 'Ranking — pódio',      to: '/admin/ranking',          flag: 'ranking', color: '#f5a623', icon: 'toprank' },
+      { label: 'Ranking — pódio',      to: '/admin/top-rank',       flag: 'ranking', color: '#f5a623', icon: 'toprank' },
       { label: 'Tela de Encerramento', to: '/admin/sistema/tela-encerramento', flag: 'admin', color: '#fb7185', icon: 'shield' },
       { label: 'Logs',                  to: '/admin/logs',              flag: 'admin', color: '#fb7185', icon: 'logs' },
       { label: 'Suporte',               to: '/admin/suporte',           flag: 'admin', color: '#2dd4bf', icon: 'support' },
@@ -111,7 +110,7 @@ export const navRevendedor: NavGroup[] = [
       { label: 'Novo Usuário',     to: '/revendedor/usuarios/novo', flag: 'consulta', color: '#818cf8', icon: 'user-plus' },
       { label: 'Apps dos clientes', to: '/revendedor/apps',       flag: 'play-fake', color: '#38bdf8', icon: 'package' },
       { label: 'Top Rank',          to: '/revendedor/top-rank',  flag: 'ranking', color: '#f5a623', icon: 'toprank' },
-      { label: 'Ranking — pódio',   to: '/revendedor/ranking',   flag: 'ranking', color: '#f5a623', icon: 'toprank' },
+      { label: 'Ranking — pódio',   to: '/revendedor/top-rank',   flag: 'ranking', color: '#f5a623', icon: 'toprank' },
     ]
   },
   {

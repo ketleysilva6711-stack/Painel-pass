@@ -8,8 +8,8 @@
         <p class="sub-title">Bem-vindo de volta. Aqui está o resumo da sua conta.</p>
       </div>
       <div class="quick-actions">
-        <router-link to="/tools/play-fake" class="pill-btn pill-btn-white">→ Publicar Play Fake</router-link>
-        <router-link to="/tools/bypass" class="pill-btn pill-btn-white">→ Novo Bypass</router-link>
+        <router-link to="/play-fake" class="pill-btn pill-btn-white">→ Publicar Play Fake</router-link>
+        <router-link to="/bypass" class="pill-btn pill-btn-white">→ Novo Bypass</router-link>
       </div>
     </div>
 
@@ -73,7 +73,7 @@
       </div>
 
       <div class="tools-grid">
-        <router-link to="/tools/play-fake" class="tool-item">
+        <router-link to="/play-fake" class="tool-item">
           <div class="tool-box box-emerald">🎮</div>
           <div class="tool-details">
             <strong>Play Fake</strong>
@@ -81,7 +81,7 @@
           </div>
         </router-link>
 
-        <router-link to="/tools/bypass" class="tool-item">
+        <router-link to="/bypass" class="tool-item">
           <div class="tool-box box-orange">🔴</div>
           <div class="tool-details">
             <strong>Bypass</strong>
@@ -89,7 +89,7 @@
           </div>
         </router-link>
 
-        <router-link to="/tools/fura-banco" class="tool-item">
+        <router-link to="/fura-banco" class="tool-item">
           <div class="tool-box box-purple">🟣</div>
           <div class="tool-details">
             <strong>Fura Banco</strong>
@@ -97,7 +97,7 @@
           </div>
         </router-link>
 
-        <router-link to="/tools/consulta" class="tool-item">
+        <router-link to="/consulta" class="tool-item">
           <div class="tool-box box-amber">🔍</div>
           <div class="tool-details">
             <strong>Consulta</strong>
@@ -105,7 +105,7 @@
           </div>
         </router-link>
 
-        <router-link to="/tools/tela-preta" class="tool-item">
+        <router-link to="/templates" class="tool-item">
           <div class="tool-box box-teal">🟩</div>
           <div class="tool-details">
             <strong>Tela Preta</strong>
@@ -113,7 +113,7 @@
           </div>
         </router-link>
 
-        <router-link to="/tools/inject-bancos" class="tool-item">
+        <router-link to="/fura-banco" class="tool-item">
           <div class="tool-box box-indigo">💉</div>
           <div class="tool-details">
             <strong>Inject Bancos</strong>

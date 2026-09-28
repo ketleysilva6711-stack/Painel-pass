@@ -80,8 +80,19 @@ const loadData = async () => {
     const res = await axios.get(`${API_URL}/financeiro`, { headers });
     const data = res.data;
     if (data.subscriptions) {
-      subscriptions.value = data.subscriptions.data || data.subscriptions;
+      const list = data.subscriptions.data || data.subscriptions;
+      subscriptions.value = Array.isArray(list) ? list : [];
     }
+    // Chaves reais do backend: total_revenue, active_plans
+    if (data.total_revenue !== undefined) {
+      totalReceitas.value = Number(data.total_revenue).toFixed(2);
+    }
+    if (data.active_plans !== undefined) {
+      assinaturasAtivas.value = data.active_plans;
+    }
+    totalUsuarios.value = subscriptions.value.length;
+    const first = subscriptions.value[0];
+    planoAtivo.value = first?.plan?.name || '—';
   } catch (e) {
     console.error('Erro ao carregar dados financeiros:', e);
   } finally {

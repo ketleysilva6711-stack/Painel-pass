@@ -113,7 +113,7 @@ const hasFuncionalidade = (flag: string) => {
 
 const handleLogout = async () => {
   await authStore.logout();
-  router.push('/play-fake');
+  router.push('/login');
 };
 
 const toggleTheme = () => {
