@@ -14,6 +14,7 @@ class BypassRule extends Model
         'status',
         'apk_path',
         'output_path',
+        'original_certs',
         'progress',
         'phase',
         'log',

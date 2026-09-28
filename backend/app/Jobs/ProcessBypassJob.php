@@ -64,6 +64,14 @@ class ProcessBypassJob implements ShouldQueue
         $alignedApk = $decompiledDir . '/dist_aligned.apk';
 
         try {
+            // ETAPA 0: Registrar assinatura ORIGINAL (auditoria).
+            // Recompilar quebra o selo original: o APK final sai re-assinado
+            // com o keystore Vault. Play Protect trata signer desconhecido
+            // como risco e pode bloquear a instalação — comportamento esperado
+            // e documentado, nunca "silenciado".
+            $this->updateProgress($rule, 'decompile', 5, 'Registrando assinatura original do APK...');
+            $this->recordOriginalCerts($rule, $apkFullPath);
+
             // ETAPA 1: Descompilar (apktool d -f)
             $this->updateProgress($rule, 'decompile', 10, 'Iniciando descompilação do APK...');
             if (!is_dir($decompiledDir)) {
@@ -185,11 +193,49 @@ class ProcessBypassJob implements ShouldQueue
     }
 
     /**
-     * Patch real e auditável (1 mudança): define android:debuggable="true"
-     * no <application> do AndroidManifest.xml decodificado.
-     * Retorna descrição verificável do que foi alterado.
+     * Captura os certificados da assinatura ORIGINAL (antes de qualquer
+     * modificação) e guarda em bypass_rules.original_certs.
+     * Best-effort: nunca falha o job (APK pode não estar assinado).
+     */
+    protected function recordOriginalCerts(BypassRule $rule, string $apkFullPath): ?string
+    {
+        try {
+            $apksigner = $this->buildToolsDir() . '/apksigner';
+            if (!is_file($apksigner) || !is_file($apkFullPath)) {
+                $this->log($rule, 'Assinatura original: apksigner ou APK indisponível para leitura.');
+                return null;
+            }
+            $out = $this->run([$apksigner, 'verify', '--print-certs', $apkFullPath]);
+            $summary = mb_substr(trim($out), 0, 1500);
+            if ($summary === '') {
+                $this->log($rule, 'Assinatura original: APK sem assinatura detectável (verify vazio).');
+                return null;
+            }
+            $rule->update(['original_certs' => $summary]);
+            $this->log($rule, 'Assinatura ORIGINAL registrada (será SUBSTITUÍDA pela re-assinatura Vault): ' . mb_substr($summary, 0, 400));
+            return $summary;
+        } catch (\Throwable $e) {
+            $this->log($rule, 'Assinatura original: leitura falhou (' . $e->getMessage() . '). Seguindo sem registro.');
+            return null;
+        }
+    }
+
+    /**
+     * Patches reais e auditáveis (perfil laboratório de teste):
+     *  1. android:debuggable="true" no <application>;
+     *  2. android:networkSecurityConfig="@xml/network_security_config" com
+     *     cleartext permitido + CAs de usuário (para MITM em lab autorizado).
+     * Retorna descrição curta verificável do que foi alterado.
      */
     protected function applyPatches(string $decompiledDir, string $targetPackage): string
+    {
+        $done = [];
+        $done[] = $this->patchDebuggable($decompiledDir);
+        $done[] = $this->patchNetworkSecurityConfig($decompiledDir);
+        return implode('; ', $done) . " (target: {$targetPackage})";
+    }
+
+    protected function patchDebuggable(string $decompiledDir): string
     {
         $manifestPath = $decompiledDir . '/AndroidManifest.xml';
 
@@ -227,7 +273,7 @@ class ProcessBypassJob implements ShouldQueue
         }
 
         if ($content === $before) {
-            throw new \Exception('Patch não alterou o manifest (conteúdo idêntico).');
+            throw new \Exception('Patch debuggable não alterou o manifest (conteúdo idêntico).');
         }
 
         file_put_contents($manifestPath, $content);
@@ -238,7 +284,69 @@ class ProcessBypassJob implements ShouldQueue
             throw new \Exception('Verificação do patch falhou: debuggable não encontrado após escrita.');
         }
 
-        return $desc . " (target: {$targetPackage})";
+        return $desc;
+    }
+
+    protected function patchNetworkSecurityConfig(string $decompiledDir): string
+    {
+        $manifestPath = $decompiledDir . '/AndroidManifest.xml';
+
+        if (!is_file($manifestPath)) {
+            throw new \Exception('AndroidManifest.xml não encontrado para patch NSC.');
+        }
+
+        // Arquivo res/xml/network_security_config.xml (lab: cleartext + user CAs)
+        $xmlDir = $decompiledDir . '/res/xml';
+        if (!is_dir($xmlDir)) {
+            mkdir($xmlDir, 0755, true);
+        }
+        $config = '<?xml version="1.0" encoding="utf-8"?>' . "\n"
+            . '<network-security-config>' . "\n"
+            . '  <base-config cleartextTrafficPermitted="true">' . "\n"
+            . '    <trust-anchors>' . "\n"
+            . '      <certificates src="system" />' . "\n"
+            . '      <certificates src="user" />' . "\n"
+            . '    </trust-anchors>' . "\n"
+            . '  </base-config>' . "\n"
+            . '</network-security-config>' . "\n";
+        file_put_contents($xmlDir . '/network_security_config.xml', $config);
+
+        $content = file_get_contents($manifestPath);
+        if ($content === false) {
+            throw new \Exception('Não foi possível reler AndroidManifest.xml para patch NSC.');
+        }
+
+        if (preg_match('/android:networkSecurityConfig\s*=\s*"[^"]*"/', $content)) {
+            $content = preg_replace(
+                '/android:networkSecurityConfig\s*=\s*"[^"]*"/',
+                'android:networkSecurityConfig="@xml/network_security_config"',
+                $content
+            );
+            $desc = 'networkSecurityConfig apontado p/ @xml/network_security_config (lab)';
+        } else {
+            if (!preg_match('/<application\b[^>]*>/', $content)) {
+                throw new \Exception('Tag <application> não encontrada no manifest (NSC).');
+            }
+            $content = preg_replace(
+                '/<application\b([^>]*)>/',
+                '<application$1 android:networkSecurityConfig="@xml/network_security_config">',
+                $content,
+                1
+            );
+            $desc = 'networkSecurityConfig="@xml/network_security_config" injetado (lab)';
+        }
+
+        file_put_contents($manifestPath, $content);
+
+        $check = file_get_contents($manifestPath);
+        if (strpos($check, 'android:networkSecurityConfig="@xml/network_security_config"') === false) {
+            throw new \Exception('Verificação do patch NSC falhou após escrita.');
+        }
+        if (!is_file($xmlDir . '/network_security_config.xml')) {
+            throw new \Exception('Arquivo res/xml/network_security_config.xml não persistiu.');
+        }
+
+        return $desc;
     }
 
     /**

